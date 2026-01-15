@@ -1,0 +1,34 @@
+[tool.poetry]
+name = "ms_blocking"
+version = "0.1.0"
+description = "Block Pandas DataFrames!"
+authors = ["RTiedrez"]
+license = "GNU General Public License v3.0"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.12,<3.14.1 || >3.14.1"
+numpy = ">=2.4.0"
+pandas = ">=2.3.3"
+scipy = ">=1.16.3"
+networkx = ">=3.6.1"
+
+[tool.ruff.lint]
+ignore = ["F405"]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[dependency-groups]
+dev = [
+    "pytest (>=9.0.2,<10.0.0)",
+    "pytest-cov (>=7.0.0,<8.0.0)",
+    "jupyter (>=1.1.1,<2.0.0)",
+    "myst-nb (>=1.3.0,<2.0.0)",
+    "sphinx-autoapi (>=3.6.1,<4.0.0)",
+    "sphinx-rtd-theme (>=3.0.2,<4.0.0)",
+    "matplotlib (>=3.10.8,<4.0.0)",
+    "python-semantic-release (>=10.5.3,<11.0.0) ; python_version >= \"3.12\" and python_version < \"4.0\"",
+    "ruff (>=0.14.11,<0.15.0)"
+]
