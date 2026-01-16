@@ -472,22 +472,16 @@ class MixedBlocker(Node):  # Leaf; For ANDs and RAM
 
         temp_data = data[total_columns].copy()
 
-        for col in self.equivalence_columns:
-            if self.normalize:
+        for col in total_columns:
+            if col in self.equivalence_columns:
                 temp_data[col] = temp_data[col].apply(normalize)
-
-        # Process overlap columns: parse and normalize elements within lists FIRST, then explode
-        for col in self.overlap_columns:
-            # Apply parse_list and then normalize each element in the resulting list
-            temp_data[col] = temp_data[col].apply(
-                lambda x: [normalize(item) for item in parse_list(x, self.word_level)]
-                if self.normalize
-                else parse_list(x, self.word_level)
-            )
-
-        # Now perform explode operations for all overlap columns
-        for col in self.overlap_columns:
-            temp_data = temp_data.explode(col)
+            elif col in self.overlap_columns:
+                temp_data[col] = temp_data[col].apply(
+                    lambda x: [normalize(item) for item in parse_list(x, self.word_level)]
+                    if self.normalize
+                    else parse_list(x, self.word_level)
+                )
+                temp_data = temp_data.explode(col)
 
         temp_data = temp_data.dropna(subset=total_columns)  # Remove empty objects
         temp_data = remove_rows_if_value_appears_only_once(temp_data, total_columns)

@@ -317,7 +317,7 @@ def add_blocks_to_dataset(
     return output_data.reset_index(drop=True)
 
 
-def add_blocks_to_pairs(data, coords, output_columns=None):
+def generate_blocking_report(data, coords, output_columns=None):
     return add_blocks_to_dataset(
         data,
         coords,
@@ -371,7 +371,7 @@ def parse_list(s, word_level=False):
     except ValueError:  # doesn't seem to be a stringified list
         parts = s.split("', '")
 
-    cleaned_items = [part.strip().strip("'") for part in parts]
+    cleaned_items = [str(part).strip().strip("'") for part in parts]
 
     if word_level:
         return [w for s in cleaned_items for w in s.split() if len(w) > 0]
