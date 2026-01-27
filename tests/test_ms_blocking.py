@@ -234,7 +234,7 @@ def test_motives_when_blocking(attribute_city_motives_true_block):
 
 
 def test_motives_when_adding_to_dataframe(attribute_city_motives_true_add):
-    """Test that keep_ungrouped_rows=False does work as intended"""
+    """Test that motives=True does work as intended"""
     expected = attribute_city_motives_true_add
     city_blocker = msb.AttributeEquivalenceBlocker(["City"])
     links = city_blocker.block(get_users(), motives=True)
