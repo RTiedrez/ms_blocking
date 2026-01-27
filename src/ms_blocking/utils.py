@@ -320,7 +320,7 @@ def add_blocks_to_dataset(
     if not data.index.is_unique:
         raise ValueError("DataFrame index must be unique to be used as an identifier.")
 
-    if len(coords) == 0 and not keep_ungrouped_rows: # Empty graph
+    if len(coords) == 0 and not keep_ungrouped_rows:  # Empty graph
         if show_as_pairs:
             columns = [col + "_l" for col in data.columns] + [
                 col + "_r" for col in data.columns
@@ -411,7 +411,7 @@ def add_blocks_to_dataset(
                 output_data = output_data.set_index(output_data.columns[0])
 
     if motives:
-        output_data.columns += ["motive"]
+        output_data["motive"] = ""
         id_list = flatten(coords.keys())
         motive_matcher = defaultdict(set)
         for row_id in id_list:
@@ -420,7 +420,7 @@ def add_blocks_to_dataset(
                     motive_matcher[row_id] |= coords[pair]
         output_data["motive"] = output_data.index.map(motive_matcher)
 
-    if "block" not in output_data.columns: # Empty coords
+    if "block" not in output_data.columns:  # Empty coords
         output_data["block"] = -1
 
     output_data = output_data.reset_index(drop=True)
