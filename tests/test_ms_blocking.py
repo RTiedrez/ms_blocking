@@ -273,3 +273,15 @@ def test_pipelining(city_age_name_websites_pipelining_id):
     links = final_blocker.block(get_users(), motives=True)
     actual = msb.add_blocks_to_dataset(get_users(), links)["id"].to_list()
     assert actual == expected
+
+
+def test_generate_blocking_report(attribute_city_show_as_pairs_true_id):
+    """Test that pipelining does work as intended"""
+    expected = attribute_city_show_as_pairs_true_id
+    city_blocker = msb.AttributeEquivalenceBlocker(["City"])
+    links = city_blocker.block(get_users(), motives=True)
+    blocked_df = msb.add_blocks_to_dataset(get_users(), links, show_as_pairs=True)
+    id_ls = blocked_df["id_l"].to_list()
+    id_rs = blocked_df["id_r"].to_list()
+    actual = set(zip(id_ls, id_rs))
+    assert actual == expected
