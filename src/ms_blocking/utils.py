@@ -255,48 +255,48 @@ def add_blocks_to_dataset(
 ):
     """Returns the intersection of an array of links
 
-     Takes two lists of paired elements, with or without motives, returns their intersection
+    Takes two lists of paired elements, with or without motives, returns their intersection
 
-     Parameters
-     ----------
-        data : DataFrame
-            DataFrame for blocking
-        coords : Array
-            Blocked coordinates
-        sort : bool
-            Whether to sort the result by block, thereby regrouping rows of the same block
-        keep_ungrouped_rows : bool
-            Whether to display rows that do not belong to any block
-        merge_blocks : bool
-            Whether to merge transitively merge blocks
-        motives : bool
-            Whether to display the reason behind each block
-        show_as_pairs : bool
-            Whether to show the output as pairs or rows rather than simply reordering the initial DataFrame
-        output_columns : list
-            Columns to show. Useful in combination with show_as_pairs as column names are altered
+    Parameters
+    ----------
+       data : DataFrame
+           DataFrame for blocking
+       coords : Array
+           Blocked coordinates
+       sort : bool
+           Whether to sort the result by block, thereby regrouping rows of the same block
+       keep_ungrouped_rows : bool
+           Whether to display rows that do not belong to any block
+       merge_blocks : bool
+           Whether to merge transitively merge blocks
+       motives : bool
+           Whether to display the reason behind each block
+       show_as_pairs : bool
+           Whether to show the output as pairs or rows rather than simply reordering the initial DataFrame
+       output_columns : list
+           Columns to show. Useful in combination with show_as_pairs as column names are altered
 
-     Returns
-     -------
-     DataFrame
-       Blocked DataFrame
+    Returns
+    -------
+    DataFrame
+      Blocked DataFrame
 
-     Examples
-     --------
-     >>> add_blocks_to_dataset(data=pd.DataFrame(
-        [
-            [0, 'first', 4],
-            [1, 'second', 6],
-            [2, 'first', 2],
-            [3, 'third', 5]
-        ],
-        columns=['id', 'rank', 'score']),
-        coords=np.array([{0, 2}]),
-        show_as_pairs=True,
-        output_columns=['id', 'rank'])
-         id_l rank_l  id_r rank_r  block
-        0     0  first     2  first      0
-     """
+    Examples
+    --------
+    >>> add_blocks_to_dataset(data=pd.DataFrame(
+       [
+           [0, 'first', 4],
+           [1, 'second', 6],
+           [2, 'first', 2],
+           [3, 'third', 5]
+       ],
+       columns=['id', 'rank', 'score']),
+       coords=np.array([{0, 2}]),
+       show_as_pairs=True,
+       output_columns=['id', 'rank'])
+        id_l rank_l  id_r rank_r  block
+       0     0  first     2  first      0
+    """
     if output_columns is None:
         output_columns = data.columns
     data = data[output_columns].copy()

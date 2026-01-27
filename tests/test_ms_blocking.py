@@ -99,17 +99,17 @@ def attribute_city_motives_true_add():
 
 @pytest.fixture
 def attribute_city_show_as_pairs_true_id():
-    return {(1,4),(2,5),(3,11),(8,3),(8,11),(10,13)}
+    return {(1, 4), (2, 5), (3, 11), (8, 3), (8, 11), (10, 13)}
 
 
 @pytest.fixture
 def attribute_city_show_as_pairs_true_columns():
-    return 	["id_l", "Name_l", "id_r", "Name_r", "block"]
+    return ["id_l", "Name_l", "id_r", "Name_r", "block"]
 
 
 @pytest.fixture
 def city_age_name_websites_pipelining_id():
-    return 	[1,4,2,5,8,11]
+    return [1, 4, 2, 5, 8, 11]
 
 
 def test_simple_attribute_equivalence_blocking(attribute_city_links):
@@ -243,6 +243,7 @@ def test_motives_when_adding_to_dataframe(attribute_city_motives_true_add):
     ].to_list()
     assert actual == expected
 
+
 def test_show_as_pairs(attribute_city_show_as_pairs_true_id):
     """Test that test_show_as_pairs=True does work as intended"""
     expected = attribute_city_show_as_pairs_true_id
@@ -254,13 +255,17 @@ def test_show_as_pairs(attribute_city_show_as_pairs_true_id):
     actual = set(zip(id_ls, id_rs))
     assert actual == expected
 
+
 def test_output_columns(attribute_city_show_as_pairs_true_columns):
     """Test that test_show_as_pairs=True does work as intended"""
     expected = attribute_city_show_as_pairs_true_columns
     city_blocker = msb.AttributeEquivalenceBlocker(["City"])
     links = city_blocker.block(get_users(), motives=True)
-    actual = msb.add_blocks_to_dataset(get_users(), links, show_as_pairs=True, output_columns=["id", "Name"]).columns.to_list()
+    actual = msb.add_blocks_to_dataset(
+        get_users(), links, show_as_pairs=True, output_columns=["id", "Name"]
+    ).columns.to_list()
     assert actual == expected
+
 
 def test_pipelining(city_age_name_websites_pipelining_id):
     """Test that pipelining does work as intended"""

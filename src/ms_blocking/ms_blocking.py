@@ -477,7 +477,9 @@ class MixedBlocker(Node):  # Leaf; For ANDs and RAM
                 temp_data[col] = temp_data[col].apply(normalize)
             elif col in self.overlap_columns:
                 temp_data[col] = temp_data[col].apply(
-                    lambda x: [normalize(item) for item in parse_list(x, self.word_level)]
+                    lambda x: [
+                        normalize(item) for item in parse_list(x, self.word_level)
+                    ]
                     if self.normalize
                     else parse_list(x, self.word_level)
                 )
