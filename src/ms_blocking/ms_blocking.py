@@ -147,7 +147,9 @@ def merge_blockers(left, right):
         return AndNode(left, right)
 
 
-class Node:  # Abstract class
+class Node:
+    """Abstract class from which derive all classes in the module"""
+
     def __init__(self, left=None, right=None):
         self.left = left
         self.right = right
@@ -173,6 +175,8 @@ class Node:  # Abstract class
 
 
 class AndNode(Node):
+    """Used to compute the intersection of the outputs of two Blockers."""
+
     def __init__(self, left, right):
         super().__init__(left, right)
 
@@ -201,6 +205,8 @@ class AndNode(Node):
 
 
 class OrNode(Node):
+    """Used to compute the union of the outputs of two Blockers."""
+
     def __init__(self, left, right):
         super().__init__(left, right)
 
@@ -217,6 +223,8 @@ class OrNode(Node):
 
 
 class AttributeEquivalenceBlocker(Node):  # Leaf
+    """To regroup rows based on equality across columns."""
+
     def __init__(
         self, blocking_columns, normalize_strings=True, must_not_be_different=None
     ):
@@ -333,6 +341,8 @@ class AttributeEquivalenceBlocker(Node):  # Leaf
 
 
 class OverlapBlocker(Node):  # Leaf
+    """To regroup rows based on overlap of one or more columns."""
+
     def __init__(
         self, blocking_columns, overlap=1, word_level=False, normalize_strings=True
     ):
@@ -410,6 +420,10 @@ class OverlapBlocker(Node):  # Leaf
 
 
 class MixedBlocker(Node):  # Leaf; For ANDs and RAM
+    """Represents the intersection of an AttributeEquivalenceBlocker and an OverlapBlocker.
+    Designed for performance and RAM efficiency.
+    """
+
     def __init__(
         self,
         equivalence_columns,
