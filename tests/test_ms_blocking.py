@@ -281,7 +281,7 @@ def test_pipelining(city_age_name_websites_pipelining_id):
 
 
 def test_generate_blocking_report(attribute_city_show_as_pairs_true_id):
-    """Test that pipelining does work as intended"""
+    """Test that generate_blocking_report does work as intended"""
     expected = attribute_city_show_as_pairs_true_id
     city_blocker = msb.AttributeEquivalenceBlocker(["City"])
     links = city_blocker.block(get_users(), motives=True)
