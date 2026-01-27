@@ -284,6 +284,7 @@ class AttributeEquivalenceBlocker(Node):  # Leaf
 
             reconstructed_data = pd.DataFrame(columns=temp_data.columns)
             for block in temp_data["block_id"].unique():
+                # noinspection PyArgumentList
                 current_block = (
                     temp_data[temp_data["block_id"] == block]
                     .sort_values(self.must_not_be_different)
@@ -300,6 +301,7 @@ class AttributeEquivalenceBlocker(Node):  # Leaf
                     random_string = "".join(
                         random.choices("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", k=10)
                     )  # As long as the string is not already in the column...
+                       # There must be a better way to do it...
                     current_block[self.must_not_be_different] = (
                         current_block[self.must_not_be_different]
                         .astype(str)
@@ -514,6 +516,7 @@ class MixedBlocker(Node):  # Leaf; For ANDs and RAM
 
             reconstructed_data = pd.DataFrame(columns=temp_data.columns)
             for block in temp_data["block_id"].unique():
+                # noinspection PyArgumentList
                 current_block = (
                     temp_data[temp_data["block_id"] == block]
                     .sort_values(self.must_not_be_different)
