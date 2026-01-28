@@ -301,7 +301,7 @@ class AttributeEquivalenceBlocker(Node):  # Leaf
                     random_string = "".join(
                         random.choices("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", k=10)
                     )  # As long as the string is not already in the column...
-                       # There must be a better way to do it...
+                    # There must be a better way to do it...
                     current_block[self.must_not_be_different] = (
                         current_block[self.must_not_be_different]
                         .astype(str)
@@ -327,13 +327,11 @@ class AttributeEquivalenceBlocker(Node):  # Leaf
         groups = temp_data.groupby(
             self.blocking_columns + self.must_not_be_different
         ).apply(lambda x: frozenset(x.index), include_groups=False)
-        coords = set(
-            [
-                frozenset(pair)
-                for group_list in groups
-                for pair in combinations(group_list, 2)
-            ]
-        )
+        coords = {
+            frozenset(pair)
+            for group_list in groups
+            for pair in combinations(group_list, 2)
+        }
 
         if motives:
             explanation = f"Same {self.blocking_columns}"
@@ -401,18 +399,25 @@ class OverlapBlocker(Node):  # Leaf
         groups = temp_data.groupby(self.blocking_columns).apply(
             lambda x: frozenset(x.index), include_groups=False
         )
-        coords = [
-            frozenset(pair)
-            for group_list in groups
-            for pair in combinations(group_list, 2)
-        ]
 
-        if self.overlap > 1:
+        if self.overlap == 1:
+            coords = {
+                frozenset(pair)
+                for group_list in groups
+                for pair in combinations(group_list, 2)
+            }
+
+        else:
+            coords = [  # In this specific case, we want to keep duplicates to track the number of occurences of a pair
+                frozenset(pair)
+                for group_list in groups
+                for pair in combinations(group_list, 2)
+            ]
             # Filter pairs that fulfill the minimum overlap condition
             occurences_dict = Counter(coords)
-            coords = [
+            coords = {
                 p for p in occurences_dict if occurences_dict[p] >= self.overlap
-            ]  # The list of pairs that fulfill the overlap condition
+            }  # The collection of pairs that fulfill the overlap condition
 
         if motives:
             explanation = f">= {self.overlap} overlap in {self.blocking_columns}"
@@ -555,16 +560,16 @@ class MixedBlocker(Node):  # Leaf; For ANDs and RAM
             lambda x: frozenset(x.index), include_groups=False
         )
 
-        coords_equivalence = [
+        coords_equivalence = {
             frozenset(pair)
             for group_list in groups_equivalence
             for pair in combinations(group_list, 2)
-        ]
-        coords_overlap = [
+        }
+        coords_overlap = {
             frozenset(pair)
             for group_list in groups_overlap
             for pair in combinations(group_list, 2)
-        ]
+        }
 
         if self.overlap > 1:
             # Filter pairs that fulfill the minimum overlap condition
@@ -573,12 +578,12 @@ class MixedBlocker(Node):  # Leaf; For ANDs and RAM
                 p for p in occurences_dict if occurences_dict[p] >= self.overlap
             ]  # The list of pairs that fulfill the overlap condition
 
-        coords = set(coords_equivalence).intersection(set(coords_overlap))
+        coords = coords_equivalence.intersection(coords_overlap)
 
         if motives:
             explanation = {f"Same {self.equivalence_columns}"}
             explanation.add(f">= {self.overlap} overlap in {self.overlap_columns}")
-            return {pair: {explanation} for pair in set(coords)}
+            return {pair: {explanation} for pair in coords}
         else:
             return set(coords)
 
