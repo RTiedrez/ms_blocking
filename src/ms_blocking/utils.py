@@ -5,25 +5,34 @@ from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import connected_components
 import pandas as pd
 import networkx as nx
-from collections import defaultdict
+
+from typing import List, Set, Iterable, Dict, Collection, Any
+
+Columns = List[str]
+Pair = Collection[int]
+CoordsBasic = Set[Pair]
+CoordsMotives = Dict[Pair, Set[str]]
+Coords = CoordsBasic | CoordsMotives
 
 
-def remove_rows_if_value_appears_only_once(data, cols):
+def remove_rows_if_value_appears_only_once(
+    data: pd.DataFrame, cols: Columns
+) -> pd.DataFrame:
     """Drops rows of a Pandas DataFrame where a certain column's values appears only once.
 
     Ensures all elements of provided columns appear at least twice in their column
 
     Parameters
     ----------
-    data : pd.DataFrame
+    data : DataFrame
       The DataFrame to preprocess
 
-    cols : list
+    cols : List[str]
       List of columns where rows that contain non-duplicated elements shall be discarded
 
     Returns
     -------
-    pd.DataFrame
+    DataFrame
       DataFrame with reduced number of rows
 
     Examples
@@ -36,17 +45,17 @@ def remove_rows_if_value_appears_only_once(data, cols):
     return data
 
 
-def start_from_zero(figures):
+def start_from_zero(figures: Collection[int]) -> List[int]:
     """Turns a list of integers into a same-length list that starts at 0, without gaps
 
     Parameters
     ----------
-    figures : Array
+    figures : Collection[int]
       List of integers
 
     Returns
     -------
-    Array
+    List[int]
       List of integers that starts at 0
 
     Examples
@@ -58,24 +67,24 @@ def start_from_zero(figures):
     return [temp[f] for f in figures]
 
 
-def solve_connected_components_from_coords(coords):
+def solve_connected_components_from_coords(coords: Coords) -> Collection[Set[int]]:
     """Solves the connected components graph problem based on a set of links between nodes
 
     Turns a list of paired elements into a list of groups
 
     Parameters
     ----------
-    coords : Array
+    coords : Coords
       List of pairs
 
     Returns
     -------
-    Array
+    Collection[Set[int]]
       List of transitively-linked elements
 
     Examples
     --------
-    >>> solve_connected_components_from_coords(np.array([{1, 4}, {1, 5}, {6, 7}]))
+    >>> solve_connected_components_from_coords({{1, 4}, {1, 5}, {6, 7}}))
     array({1, 4, 5}, {6, 7})
     """
 
@@ -111,19 +120,19 @@ def solve_connected_components_from_coords(coords):
     return original_labels
 
 
-def normalize(text):
+def normalize(text: str) -> str:
     """Normalize a strings
 
     Ensures succesful comparison of different comparisons of the same string
 
     Parameters
     ----------
-    text : string
+    text : str
       The text to preprocess
 
     Returns
     -------
-    string
+    str
       Normalized string
 
     Examples
@@ -142,19 +151,19 @@ def normalize(text):
         return text
 
 
-def flatten(list_of_iterables_):
+def flatten(list_of_iterables_: Collection[Iterable]) -> List[Any] | None:
     """Returns a flattened list from a list of iterables
 
     The iterables may be lists, sets...
 
     Parameters
     ----------
-    list_of_iterables_ : list-like
+    list_of_iterables_ : Collection[Iterable]
       The list to flatten
 
     Returns
     -------
-    list
+    List[Any]
       1-Dimensional list
 
     Examples
@@ -170,22 +179,22 @@ def flatten(list_of_iterables_):
         print("Argument must a list-like object")
 
 
-def merge_blocks_or(coords_1, coords_2):
+def merge_blocks_or(coords_1: Coords, coords_2: Coords) -> Coords:
     """Returns the union of an array of links
 
     Takes two lists of paired elements, with or without motives, returns their union
 
     Parameters
     ----------
-    coords_1 : Array
-      List of pairs
+    coords_1 : Coords
+      Array of coordinates
 
-    coords_2 : Array
-      List of pairs
+    coords_2 : Coords
+      Array of coordinates
 
     Returns
     -------
-    Array
+    Coords
       Array of coordinates
 
     Examples
@@ -209,22 +218,22 @@ def merge_blocks_or(coords_1, coords_2):
         return coords_1.union(coords_2)
 
 
-def merge_blocks_and(coords_1, coords_2):
+def merge_blocks_and(coords_1: Coords, coords_2: Coords) -> Coords:
     """Returns the intersection of an array of links
 
     Takes two lists of paired elements, with or without motives, returns their intersection
 
     Parameters
     ----------
-    coords_1 : Array
-      List of pairs
+    coords_1 : Coords
+      Array of coordinates
 
-    coords_2 : Array
-      List of pairs
+    coords_2 : Coords
+      Array of coordinates
 
     Returns
     -------
-    Array
+    Coords
       Array of coordinates
 
     Examples
@@ -244,15 +253,15 @@ def merge_blocks_and(coords_1, coords_2):
 
 
 def add_blocks_to_dataset(
-    data,
-    coords,
-    sort=True,
-    keep_ungrouped_rows=False,
-    merge_blocks=True,
-    motives=False,
-    show_as_pairs=False,
-    output_columns=None,
-):
+    data: pd.DataFrame,
+    coords: Coords,
+    sort: bool = True,
+    keep_ungrouped_rows: bool = False,
+    merge_blocks: bool = True,
+    motives: bool = False,
+    show_as_pairs: bool = False,
+    output_columns: Columns = None,
+) -> pd.DataFrame:
     """Returns the intersection of an array of links
 
     Takes two lists of paired elements, with or without motives, returns their intersection
@@ -341,14 +350,18 @@ def add_blocks_to_dataset(
             }
         else:  # We solve the cliques problem
             g = nx.Graph()
+            # noinspection PyTypeChecker
             g.add_edges_from(coords)
             complete_subgraphs = list(nx.find_cliques(g))
             complete_subgraphs = sorted(complete_subgraphs)
             # matcher = {row_id:([i for i in range(len(complete_subgraphs)) if row_id in complete_subgraphs[i]]) for row_id in set(flatten(complete_subgraphs))}
-            matcher = defaultdict(list)
+            matcher = dict()
             for i, clique in enumerate(complete_subgraphs):
                 for node_idx in clique:
-                    matcher[node_idx].append(i)
+                    if node_idx in matcher.keys():
+                        matcher[node_idx].append(i)
+                    else:
+                        matcher[node_idx] = [i]
 
         if show_as_pairs:
             output_data = pd.DataFrame()
@@ -413,11 +426,15 @@ def add_blocks_to_dataset(
     if motives:
         output_data["motive"] = ""
         id_list = flatten(coords.keys())
-        motive_matcher = defaultdict(set)
-        for row_id in id_list:
-            for pair in coords:
-                if row_id in pair:
-                    motive_matcher[row_id] |= coords[pair]
+        motive_matcher = {
+            row_id: frozenset(
+                reason
+                for pair in coords.keys()
+                if row_id in pair
+                for reason in coords[pair]
+            )
+            for row_id in id_list
+        }
         output_data["motive"] = output_data.index.map(motive_matcher)
 
     if "block" not in output_data.columns:  # Empty coords
@@ -428,7 +445,9 @@ def add_blocks_to_dataset(
     return output_data
 
 
-def generate_blocking_report(data, coords, output_columns=None):
+def generate_blocking_report(
+    data: pd.DataFrame, coords: Coords, output_columns: Collection[str] = None
+) -> pd.DataFrame:
     """
     Shorthand for add_blocks_to_dataset with below arguments
     """
@@ -443,22 +462,22 @@ def generate_blocking_report(data, coords, output_columns=None):
     )
 
 
-def parse_list(s, word_level=False):
+def parse_list(s: str | List, word_level: bool = False) -> List[str]:
     """Turns a stringified list into an actual python list, taking extra inner quotes into account
 
     Ensures compatibility across different data formats, including ones that do not natively support list or table data.
 
     Parameters
     ----------
-    s : string
+    s : str
       The stringified representation of a list e.g. "['string 1', 'string 2', ...]"
 
-    word_level : Boolean
+    word_level : bool
       Whether to return a list of all words within s instead of a list of each comma-separated element
 
     Returns
     -------
-    list
+    List[str]
       A python list based on s
 
     Examples
