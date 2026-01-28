@@ -14,6 +14,9 @@ CoordsBasic = Set[Pair]
 CoordsMotives = Dict[Pair, Set[str]]
 Coords = CoordsBasic | CoordsMotives
 
+_PUNCT_RE = re.compile(r'[!"#$%&()*+,-./:;<=>?@\[\\\]^_`{|}~]')
+_SPACE_RE = re.compile(r"\s+")
+
 
 def remove_rows_if_value_appears_only_once(
     data: pd.DataFrame, cols: Columns
@@ -120,35 +123,64 @@ def solve_connected_components_from_coords(coords: Coords) -> Collection[Set[int
     return original_labels
 
 
-def normalize(text: str) -> str:
-    """Normalize a strings
+def normalize_function(string: Any) -> Any:
+    """Normalize a single string or return original if not a string.
 
-    Ensures succesful comparison of different comparisons of the same string
+    Ensures successful comparison of different comparisons of the same string
 
     Parameters
     ----------
-    text : str
+    string : Any
       The text to preprocess
 
     Returns
     -------
-    str
-      Normalized string
+    Any
+      Normalized string or original value if not a string
+
+    Examples
+    --------
+    >>> normalize_function('I like_Music!!! :)')
+    'i like music'
+    """
+    if not isinstance(string, str):
+        return string
+
+    string = _PUNCT_RE.sub(" ", string)
+    string = _SPACE_RE.sub("", string)
+    string = string.casefold().strip()
+    return string
+
+
+def normalize(text: Any) -> Any:
+    """Normalize a string, an iterable of strings, or other types.
+
+    Ensures successful comparison of different comparisons of the same string
+
+    Parameters
+    ----------
+    text : Any
+      The text(s) to preprocess
+
+    Returns
+    -------
+    Any
+      Normalized string, list of normalized strings, or original value if not applicable
 
     Examples
     --------
     >>> normalize('I like_Music!!! :)')
     'i like music'
     """
-
-    try:
-        text = re.sub(r'[$&+:_;=?@#\'"<>[][|\\,.^*)(…%!}{`/°-]', " ", text)
-        text = re.sub(r"\s+", " ", text)
-        text = text.casefold().strip()
+    if pd.isna(text):
         return text
 
-    except TypeError:  # NaN's
-        return text
+    if isinstance(text, str):
+        return normalize_function(text)
+    elif isinstance(text, (list, tuple, set)):
+        return [normalize_function(item) for item in text]
+    else:
+        return normalize_function(str(text))
 
 
 def flatten(list_of_iterables_: Collection[Iterable]) -> List[Any] | None:
@@ -489,7 +521,10 @@ def parse_list(s: str | List, word_level: bool = False) -> List[str]:
     """
 
     if type(s) is list:  # If we already have a list
-        return s
+        if len(s) == 1 and s[0][0] == "[" and s[0][-1] == "]":
+            s = s[0]
+        else:
+            return s
 
     if pd.isna(s):
         return []
@@ -504,7 +539,7 @@ def parse_list(s: str | List, word_level: bool = False) -> List[str]:
     except ValueError:  # doesn't seem to be a stringified list
         parts = s.split("', '")
 
-    cleaned_items = [str(part).strip().strip("'") for part in parts]
+    cleaned_items = [str(part).strip().strip("''") for part in parts]
 
     if word_level:
         return [w for s in cleaned_items for w in s.split() if len(w) > 0]
