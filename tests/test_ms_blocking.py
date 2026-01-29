@@ -112,7 +112,6 @@ def city_age_name_websites_pipelining_id():
     return [1, 4, 2, 5, 8, 11]
 
 
-
 @pytest.fixture
 def city_age_websites_pipelining_motives():
     return [
@@ -128,9 +127,9 @@ def city_age_websites_pipelining_motives():
         frozenset({"Same 'Age'", "Same 'City'"}),
         frozenset({">=1 overlap in 'websites'"}),
         frozenset({">=1 overlap in 'websites'"}),
-
-        frozenset({">=1 overlap in 'websites'"})
+        frozenset({">=1 overlap in 'websites'"}),
     ]
+
 
 @pytest.fixture
 def city_age_websites_pipelining_scores():
@@ -316,6 +315,7 @@ def test_generate_blocking_report(attribute_city_show_as_pairs_true_id):
     actual = set(zip(id_ls, id_rs))
     assert actual == expected
 
+
 def test_pipelining_motives(city_age_websites_pipelining_motives):
     """Test that pipelining does work as intended regarding motives"""
     expected = city_age_websites_pipelining_motives
@@ -324,8 +324,11 @@ def test_pipelining_motives(city_age_websites_pipelining_motives):
     websites_blocker = msb.OverlapBlocker(["websites"])
     final_blocker = (city_blocker & age_blocker) | websites_blocker
     links = final_blocker.block(get_users(), motives=True)
-    actual = msb.add_blocks_to_dataset(get_users(), links, show_as_pairs=True, motives=True, merge_blocks=False)["motive"].to_list()
+    actual = msb.add_blocks_to_dataset(
+        get_users(), links, show_as_pairs=True, motives=True, merge_blocks=False
+    )["motive"].to_list()
     assert actual == expected
+
 
 def test_pipelining_scores(city_age_websites_pipelining_scores):
     """Test that scoring does work as intended"""
@@ -335,7 +338,89 @@ def test_pipelining_scores(city_age_websites_pipelining_scores):
     websites_blocker = msb.OverlapBlocker(["websites"])
     final_blocker = (city_blocker & age_blocker) | websites_blocker
     links = final_blocker.block(get_users(), motives=True)
-    report = msb.add_blocks_to_dataset(get_users(), links, show_as_pairs=True, motives=True, merge_blocks=False)
+    report = msb.add_blocks_to_dataset(
+        get_users(), links, show_as_pairs=True, motives=True, merge_blocks=False
+    )
     actual = sorted(msb.scoring(report), reverse=True)
     assert actual == expected
 
+
+def test_merge_blockers_aa():
+    """Test that merging blockers does work as intended"""
+    expected = msb.AttributeEquivalenceBlocker(["City", "Age"])
+    city_blocker = msb.AttributeEquivalenceBlocker(["City"])
+    age_blocker = msb.AttributeEquivalenceBlocker(["Age"])
+    actual = city_blocker & age_blocker
+    assert actual == expected
+
+
+def test_merge_blockers_oo():
+    """Test that merging blockers does work as intended"""
+    expected = msb.OverlapBlocker(["websites"])
+    websites_blocker_1 = msb.OverlapBlocker(["websites"])
+    websites_blocker_2 = msb.OverlapBlocker(["websites"])
+    actual = websites_blocker_1 & websites_blocker_2
+    assert actual == expected
+
+
+def test_merge_blockers_oa():
+    """Test that merging blockers does work as intended"""
+    expected = msb.MixedBlocker(["City"], ["websites"])
+    websites_blocker = msb.OverlapBlocker(["websites"])
+    city_blocker = msb.AttributeEquivalenceBlocker(["City"])
+    actual = websites_blocker & city_blocker
+    assert actual == expected
+
+
+def test_merge_blockers_ao():
+    """Test that merging blockers does work as intended"""
+    expected = msb.MixedBlocker(["City"], ["websites"])
+    city_blocker = msb.AttributeEquivalenceBlocker(["City"])
+    websites_blocker = msb.OverlapBlocker(["websites"])
+    actual = city_blocker & websites_blocker
+    assert actual == expected
+
+
+def test_merge_blockers_mm():
+    """Test that merging blockers does work as intended"""
+    expected = msb.MixedBlocker(["City", "Age"], ["websites"])
+    mixed_blocker_1 = msb.MixedBlocker(["City"], ["websites"])
+    mixed_blocker_2 = msb.MixedBlocker(["Age"], ["websites"])
+    actual = mixed_blocker_1 & mixed_blocker_2
+    assert actual == expected
+
+
+def test_merge_blockers_ma():
+    """Test that merging blockers does work as intended"""
+    expected = msb.MixedBlocker(["City", "Age"], ["websites"])
+    mixed_blocker = msb.MixedBlocker(["City"], ["websites"])
+    city_blocker = msb.AttributeEquivalenceBlocker(["Age"])
+    actual = mixed_blocker & city_blocker
+    assert actual == expected
+
+
+def test_merge_blockers_mo():
+    """Test that merging blockers does work as intended"""
+    expected = msb.MixedBlocker(["City"], ["websites"])
+    mixed_blocker = msb.MixedBlocker(["City"], ["websites"])
+    websites_blocker = msb.OverlapBlocker(["websites"])
+    actual = mixed_blocker & websites_blocker
+    assert actual == expected
+
+
+def test_merge_blockers_am():
+    """Test that merging blockers does work as intended"""
+    expected = msb.MixedBlocker(["City", "Age"], ["websites"])
+    city_blocker = msb.AttributeEquivalenceBlocker(["City"])
+    mixed_blocker = msb.MixedBlocker(["Age"], ["websites"])
+    actual = city_blocker & mixed_blocker
+    assert actual == expected
+
+
+def test_merge_blockers_om():
+    """Test that merging blockers does work as intended"""
+    expected = msb.MixedBlocker(["Age"], ["websites"])
+    websites_blocker = msb.OverlapBlocker(["websites"])
+    mixed_blocker = msb.MixedBlocker(["Age"], ["websites"])
+    actual = websites_blocker & mixed_blocker
+    assert actual == expected
