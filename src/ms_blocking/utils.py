@@ -547,7 +547,7 @@ def parse_list(s: str | List, word_level: bool = False) -> List[str]:
         return [s for s in cleaned_items if len(s) > 0]
 
 def scoring(data: pd.DataFrame, motives_column: str="motive") -> pd.Series:
-    """Adds a score to a blocked DataFrame based on the number of motives
+    """Add a score to a blocked DataFrame based on the number of motives
 
     Parameters
     ----------
