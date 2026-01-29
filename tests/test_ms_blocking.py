@@ -83,18 +83,18 @@ def attribute_city_keep_ungrouped_rows_false():
 @pytest.fixture
 def attribute_city_motives_true_block():
     return {
-        frozenset({3, 8}): {"Same ['City']"},
-        frozenset({1, 4}): {"Same ['City']"},
-        frozenset({8, 11}): {"Same ['City']"},
-        frozenset({3, 11}): {"Same ['City']"},
-        frozenset({2, 5}): {"Same ['City']"},
-        frozenset({10, 13}): {"Same ['City']"},
+        frozenset({3, 8}): {"Same 'City'"},
+        frozenset({1, 4}): {"Same 'City'"},
+        frozenset({8, 11}): {"Same 'City'"},
+        frozenset({3, 11}): {"Same 'City'"},
+        frozenset({2, 5}): {"Same 'City'"},
+        frozenset({10, 13}): {"Same 'City'"},
     }
 
 
 @pytest.fixture
 def attribute_city_motives_true_add():
-    return [{"Same ['City']"}] * 9
+    return [{"Same 'City'"}] * 9
 
 
 @pytest.fixture
@@ -110,6 +110,31 @@ def attribute_city_show_as_pairs_true_columns():
 @pytest.fixture
 def city_age_name_websites_pipelining_id():
     return [1, 4, 2, 5, 8, 11]
+
+
+
+@pytest.fixture
+def city_age_websites_pipelining_motives():
+    return [
+        frozenset({"Same 'Age'", "Same 'City'", ">=1 overlap in 'websites'"}),
+        frozenset({"Same 'Age'", "Same 'City'", ">=1 overlap in 'websites'"}),
+        frozenset({"Same 'Age'", "Same 'City'", ">=1 overlap in 'websites'"}),
+        frozenset({"Same 'Age'", "Same 'City'", ">=1 overlap in 'websites'"}),
+        frozenset({"Same 'Age'", "Same 'City'", ">=1 overlap in 'websites'"}),
+        frozenset({"Same 'Age'", "Same 'City'", ">=1 overlap in 'websites'"}),
+        frozenset({">=1 overlap in 'websites'"}),
+        frozenset({">=1 overlap in 'websites'"}),
+        frozenset({"Same 'Age'", "Same 'City'"}),
+        frozenset({"Same 'Age'", "Same 'City'"}),
+        frozenset({">=1 overlap in 'websites'"}),
+        frozenset({">=1 overlap in 'websites'"}),
+
+        frozenset({">=1 overlap in 'websites'"})
+    ]
+
+@pytest.fixture
+def city_age_websites_pipelining_scores():
+    return [3, 3, 3, 3, 3, 3, 2, 2, 1, 1, 1, 1, 1]
 
 
 def test_simple_attribute_equivalence_blocking(attribute_city_links):
@@ -290,3 +315,27 @@ def test_generate_blocking_report(attribute_city_show_as_pairs_true_id):
     id_rs = blocked_df["id_r"].to_list()
     actual = set(zip(id_ls, id_rs))
     assert actual == expected
+
+def test_pipelining_motives(city_age_websites_pipelining_motives):
+    """Test that pipelining does work as intended regarding motives"""
+    expected = city_age_websites_pipelining_motives
+    city_blocker = msb.AttributeEquivalenceBlocker(["City"])
+    age_blocker = msb.AttributeEquivalenceBlocker(["Age"])
+    websites_blocker = msb.OverlapBlocker(["websites"])
+    final_blocker = (city_blocker & age_blocker) | websites_blocker
+    links = final_blocker.block(get_users(), motives=True)
+    actual = msb.add_blocks_to_dataset(get_users(), links, show_as_pairs=True, motives=True, merge_blocks=False)["motive"].to_list()
+    assert actual == expected
+
+def test_pipelining_scores(city_age_websites_pipelining_scores):
+    """Test that scoring does work as intended"""
+    expected = city_age_websites_pipelining_scores
+    city_blocker = msb.AttributeEquivalenceBlocker(["City"])
+    age_blocker = msb.AttributeEquivalenceBlocker(["Age"])
+    websites_blocker = msb.OverlapBlocker(["websites"])
+    final_blocker = (city_blocker & age_blocker) | websites_blocker
+    links = final_blocker.block(get_users(), motives=True)
+    report = msb.add_blocks_to_dataset(get_users(), links, show_as_pairs=True, motives=True, merge_blocks=False)
+    actual = sorted(msb.scoring(report), reverse=True)
+    assert actual == expected
+
