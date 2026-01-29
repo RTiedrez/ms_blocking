@@ -23,11 +23,14 @@ jobs:
     - name: Install package
       run: poetry install
 
+    #- name: Install ruff
+    #  run: poetry install ruff
+
     - name: Format with ruff
-      run: ruff format
+      run: poetry run ruff format
 
     - name: Test with pytest
-      run: poetry run pytest tests/ --cov=pycounts --cov-report=xml
+      run: poetry run pytest tests/ --cov=pycounts --cov-report=html
 
     - name: Build documentation
       run: poetry run make html --directory docs/

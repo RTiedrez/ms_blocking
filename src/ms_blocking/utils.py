@@ -546,7 +546,8 @@ def parse_list(s: str | List, word_level: bool = False) -> List[str]:
     else:
         return [s for s in cleaned_items if len(s) > 0]
 
-def scoring(data: pd.DataFrame, motives_column: str="motive") -> pd.Series:
+
+def scoring(data: pd.DataFrame, motives_column: str = "motive") -> pd.Series:
     """Add a score to a blocked DataFrame based on the number of motives
 
     Parameters
@@ -565,7 +566,7 @@ def scoring(data: pd.DataFrame, motives_column: str="motive") -> pd.Series:
 
     # Check that we do have motives
     if motives_column not in data.columns:
-        raise ValueError(f"Specified motives column \"{motives_column}\" does not exist")
+        raise ValueError(f'Specified motives column "{motives_column}" does not exist')
 
     if "score" in data.columns:
         print("Renaming 'score' column to 'score_old'")

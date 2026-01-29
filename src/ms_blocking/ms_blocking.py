@@ -242,7 +242,7 @@ class AndNode(Node):
         return f"AndNode{{{self.left}, {self.right}}}"
 
     def __eq__(self, other):
-        return self.left==other.left and self.right==other.right
+        return self.left == other.left and self.right == other.right
 
     def block(self, df, motives=False):
         # In order not to perform redundant computations, we first filter out the rows that were not considered by the first blocker before running the second blocker
@@ -275,7 +275,7 @@ class OrNode(Node):
         return f"OrNode{{{self.left}, {self.right}}}"
 
     def __eq__(self, other):
-        return self.left==other.left and self.right==other.right
+        return self.left == other.left and self.right == other.right
 
     def block(self, df, motives=False):
         coords_left = self.left.block(df, motives=motives)
