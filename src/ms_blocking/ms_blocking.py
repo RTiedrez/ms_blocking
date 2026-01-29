@@ -338,7 +338,7 @@ class AttributeEquivalenceBlocker(Node):  # Leaf
         else:
             return False
 
-    def block(self, data, motives=False):  # /!\ allow_mising may create HUGE outputs
+    def block(self, data, motives=False):
         """Regroup rows based on equality of one or more columns"""
 
         print("Processing", self)
