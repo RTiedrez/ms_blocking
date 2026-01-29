@@ -207,8 +207,8 @@ def block_overlap(groups, overlap):
     return coords
 
 
-def add_motives_to_coords(coords, explanation):
-    return {pair: {explanation} for pair in coords}
+def add_motives_to_coords(coords, explanations):
+    return {pair: explanations for pair in coords}
 
 
 class Node:
@@ -366,8 +366,8 @@ class AttributeEquivalenceBlocker(Node):  # Leaf
         }
 
         if motives:
-            explanation = f"Same {self.blocking_columns}"
-            return add_motives_to_coords(coords, explanation)
+            explanations = {f"Same {column_name}" for column_name in self.blocking_columns}
+            return add_motives_to_coords(coords, explanations)
         else:
             return set(coords)  # set is unnnecessary
 
@@ -435,8 +435,8 @@ class OverlapBlocker(Node):  # Leaf
         coords = block_overlap(groups=groups, overlap=self.overlap)
 
         if motives:
-            explanation = f">= {self.overlap} overlap in {self.blocking_columns}"
-            return add_motives_to_coords(coords, explanation)
+            explanations = {f">= {self.overlap}" in column_name for column_name in self.blocking_columns}
+            return add_motives_to_coords(coords, explanations)
         else:
             return set(coords)
 
@@ -555,9 +555,8 @@ class MixedBlocker(Node):  # Leaf; For ANDs and RAM
         coords = coords_equivalence.intersection(coords_overlap)
 
         if motives:
-            explanation = {f"Same {self.equivalence_columns}"}
-            explanation.add(f">= {self.overlap} overlap in {self.overlap_columns}")
-            return add_motives_to_coords(coords, explanation)
+            explanations = {f"Same {column_name}" for column_name in self.equivalence_columns} | {f">= {self.overlap}" in column_name for column_name in self.overlap_columns}
+            return add_motives_to_coords(coords, explanations)
         else:
             return set(coords)
 
