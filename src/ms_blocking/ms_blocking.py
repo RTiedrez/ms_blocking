@@ -225,14 +225,8 @@ class Node:
     def __and__(self, other):
         return merge_blockers(self, other)
 
-    def __rand__(self, other):
-        return merge_blockers(other, self)
-
     def __or__(self, other):
         return OrNode(self, other)
-
-    def __ror__(self, other):
-        return OrNode(other, self)
 
     def __repr__(self):
         return f"Node{{{self.left}, {self.right}}}"
@@ -246,6 +240,9 @@ class AndNode(Node):
 
     def __repr__(self):
         return f"AndNode{{{self.left}, {self.right}}}"
+
+    def __eq__(self, other):
+        return self.left==other.left and self.right==other.right
 
     def block(self, df, motives=False):
         # In order not to perform redundant computations, we first filter out the rows that were not considered by the first blocker before running the second blocker
@@ -276,6 +273,9 @@ class OrNode(Node):
 
     def __repr__(self):
         return f"OrNode{{{self.left}, {self.right}}}"
+
+    def __eq__(self, other):
+        return self.left==other.left and self.right==other.right
 
     def block(self, df, motives=False):
         coords_left = self.left.block(df, motives=motives)
