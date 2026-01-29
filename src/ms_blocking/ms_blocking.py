@@ -321,8 +321,25 @@ class AttributeEquivalenceBlocker(Node):  # Leaf
     def __repr__(self):
         return f"AttributeEquivalenceBlocker({self.blocking_columns}, {self.must_not_be_different})"
 
+    def __eq__(self, other):
+        if type(other) is AttributeEquivalenceBlocker:
+            return (
+                set(self.blocking_columns) == set(other.blocking_columns)
+                and self.must_not_be_different == other.must_not_be_different
+                and self.normalize == other.normalize
+            )
+        elif type(other) is MixedBlocker:
+            return (
+                set(self.blocking_columns) == set(other.equivalence_columns)
+                and not other.overlap_columns
+                and self.must_not_be_different == other.must_not_be_different
+                and self.normalize == other.normalize
+            )
+        else:
+            return False
+
     def block(self, data, motives=False):  # /!\ allow_mising may create HUGE outputs
-        """Regroups rows based on equality of one or more columns"""
+        """Regroup rows based on equality of one or more columns"""
 
         print("Processing", self)
 
@@ -366,7 +383,9 @@ class AttributeEquivalenceBlocker(Node):  # Leaf
         }
 
         if motives:
-            explanations = {f"Same \'{column_name}\'" for column_name in self.blocking_columns}
+            explanations = {
+                f"Same '{column_name}'" for column_name in self.blocking_columns
+            }
             return add_motives_to_coords(coords, explanations)
         else:
             return set(coords)  # set is unnnecessary
@@ -398,8 +417,27 @@ class OverlapBlocker(Node):  # Leaf
     def __repr__(self):
         return f"OverlapBlocker({self.blocking_columns}, {self.overlap})"
 
+    def __eq__(self, other):
+        if type(other) is OverlapBlocker:
+            return (
+                set(self.blocking_columns) == set(other.blocking_columns)
+                and self.normalize == other.normalize
+                and self.overlap == other.overlap
+                and self.word_level == other.word_level
+            )
+        elif type(other) is MixedBlocker:
+            return (
+                set(self.blocking_columns) == set(other.overlap_columns)
+                and not other.equivalence_columns
+                and self.normalize == other.normalize
+                and self.word_level == other.word_level
+                and self.overlap == other.overlap
+            )
+        else:
+            return False
+
     def block(self, data, motives=False):
-        """Regroups rows based on overlap of one or more columns"""
+        """Regroup rows based on overlap of one or more columns"""
 
         print("Processing", self)
 
@@ -435,14 +473,17 @@ class OverlapBlocker(Node):  # Leaf
         coords = block_overlap(groups=groups, overlap=self.overlap)
 
         if motives:
-            explanations = {f">={self.overlap}{' word_level' if self.word_level else ''} overlap in \'{column_name}\'" for column_name in self.blocking_columns}
+            explanations = {
+                f">={self.overlap}{' word_level' if self.word_level else ''} overlap in '{column_name}'"
+                for column_name in self.blocking_columns
+            }
             return add_motives_to_coords(coords, explanations)
         else:
             return set(coords)
 
 
 class MixedBlocker(Node):  # Leaf; For ANDs and RAM
-    """Represents the intersection of an AttributeEquivalenceBlocker and an OverlapBlocker.
+    """Represent the intersection of an AttributeEquivalenceBlocker and an OverlapBlocker.
     Designed for performance and RAM efficiency.
     """
 
@@ -499,8 +540,34 @@ class MixedBlocker(Node):  # Leaf; For ANDs and RAM
     def __repr__(self):
         return f"MixedBlocker({self.equivalence_columns}, {self.overlap_columns}, {self.overlap})"
 
+    def __eq__(self, other):
+        if type(other) is AttributeEquivalenceBlocker:
+            return (
+                set(self.equivalence_columns) == set(other.blocking_columns)
+                and self.normalize == other.normalize
+                and self.must_not_be_different == other.must_not_be_different
+            )
+        elif type(other) is OverlapBlocker:
+            return (
+                set(self.overlap_columns) == set(other.blocking_columns)
+                and self.normalize == other.normalize
+                and self.overlap == other.overlap
+                and self.word_level == other.word_level
+            )
+        elif type(other) is MixedBlocker:
+            return (
+                set(self.equivalence_columns) == set(other.equivalence_columns)
+                and set(self.overlap_columns) == set(other.overlap_columns)
+                and self.must_not_be_different == other.must_not_be_different
+                and self.normalize == other.normalize
+                and self.word_level == other.word_level
+                and self.overlap == other.overlap
+            )
+        else:
+            return False
+
     def block(self, data, motives=False):
-        """Regroups rows based on overlap of one or more columns"""
+        """Regroup rows based on overlap of one or more columns"""
 
         print("Processing", self)
 
@@ -555,7 +622,12 @@ class MixedBlocker(Node):  # Leaf; For ANDs and RAM
         coords = coords_equivalence.intersection(coords_overlap)
 
         if motives:
-            explanations = {f"Same \'{column_name}\'" for column_name in self.equivalence_columns} | {f">={self.overlap}{' word_level' if self.word_level else ''} overlap in \'{column_name}\'" for column_name in self.overlap_columns}
+            explanations = {
+                f"Same '{column_name}'" for column_name in self.equivalence_columns
+            } | {
+                f">={self.overlap}{' word_level' if self.word_level else ''} overlap in '{column_name}'"
+                for column_name in self.overlap_columns
+            }
             return add_motives_to_coords(coords, explanations)
         else:
             return set(coords)
