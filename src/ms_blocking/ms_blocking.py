@@ -186,6 +186,27 @@ def must_not_be_different_apply(
             reconstructed_data = pd.concat([reconstructed_data, current_block])
     return reconstructed_data
 
+def block_overlap(groups, overlap):
+    coords = {
+        frozenset(pair)
+        for group_list in groups
+        for pair in combinations(group_list, 2)
+    }
+
+    if overlap>1:
+        coords = [  # In this specific case, we want to keep duplicates to track the number of occurences of a pair
+            frozenset(pair)
+            for group_list in groups
+            for pair in combinations(group_list, 2)
+        ]
+        # Filter pairs that fulfill the minimum overlap condition
+        occurences_dict = Counter(coords)
+        coords = {
+            p for p in occurences_dict if occurences_dict[p] >= overlap
+        }  # The collection of pairs that fulfill the overlap condition
+
+    return coords
+
 def add_motives_to_coords(coords, explanation):
     return {pair: {explanation} for pair in coords}
 
@@ -410,24 +431,7 @@ class OverlapBlocker(Node):  # Leaf
             lambda x: frozenset(x.index), include_groups=False
         )
 
-        if self.overlap == 1:
-            coords = {
-                frozenset(pair)
-                for group_list in groups
-                for pair in combinations(group_list, 2)
-            }
-
-        else:
-            coords = [  # In this specific case, we want to keep duplicates to track the number of occurences of a pair
-                frozenset(pair)
-                for group_list in groups
-                for pair in combinations(group_list, 2)
-            ]
-            # Filter pairs that fulfill the minimum overlap condition
-            occurences_dict = Counter(coords)
-            coords = {
-                p for p in occurences_dict if occurences_dict[p] >= self.overlap
-            }  # The collection of pairs that fulfill the overlap condition
+        coords = block_overlap(groups=groups, overlap=self.overlap)
 
         if motives:
             explanation = f">= {self.overlap} overlap in {self.blocking_columns}"
@@ -544,18 +548,8 @@ class MixedBlocker(Node):  # Leaf; For ANDs and RAM
             for group_list in groups_equivalence
             for pair in combinations(group_list, 2)
         }
-        coords_overlap = {
-            frozenset(pair)
-            for group_list in groups_overlap
-            for pair in combinations(group_list, 2)
-        }
 
-        if self.overlap > 1:
-            # Filter pairs that fulfill the minimum overlap condition
-            occurences_dict = Counter(coords_overlap)
-            coords_overlap = [
-                p for p in occurences_dict if occurences_dict[p] >= self.overlap
-            ]  # The list of pairs that fulfill the overlap condition
+        coords_overlap = block_overlap(groups=groups_overlap, overlap=self.overlap)
 
         coords = coords_equivalence.intersection(coords_overlap)
 
