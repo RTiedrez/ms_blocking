@@ -186,6 +186,8 @@ def must_not_be_different_apply(
             reconstructed_data = pd.concat([reconstructed_data, current_block])
     return reconstructed_data
 
+def add_motives_to_coords(coords, explanation):
+    return {pair: {explanation} for pair in coords}
 
 class Node:
     """Abstract class from which derive all classes in the module"""
@@ -343,7 +345,7 @@ class AttributeEquivalenceBlocker(Node):  # Leaf
 
         if motives:
             explanation = f"Same {self.blocking_columns}"
-            return {pair: {explanation} for pair in set(coords)}
+            return add_motives_to_coords(coords, explanation)
         else:
             return set(coords)  # set is unnnecessary
 
@@ -429,7 +431,7 @@ class OverlapBlocker(Node):  # Leaf
 
         if motives:
             explanation = f">= {self.overlap} overlap in {self.blocking_columns}"
-            return {pair: {explanation} for pair in set(coords)}
+            return add_motives_to_coords(coords, explanation)
         else:
             return set(coords)
 
@@ -560,9 +562,8 @@ class MixedBlocker(Node):  # Leaf; For ANDs and RAM
         if motives:
             explanation = {f"Same {self.equivalence_columns}"}
             explanation.add(f">= {self.overlap} overlap in {self.overlap_columns}")
-            return {pair: {explanation} for pair in coords}
+            return add_motives_to_coords(coords, explanation)
         else:
             return set(coords)
-
 
 # /!\ TODO: make class for motives (+ pair, motive dict)?
