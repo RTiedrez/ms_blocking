@@ -1,3 +1,4 @@
+import pandas as pd
 import pytest
 
 import ms_blocking.ms_blocking as msb
@@ -134,6 +135,16 @@ def city_age_websites_pipelining_motives():
 @pytest.fixture
 def city_age_websites_pipelining_scores():
     return [3, 3, 3, 3, 3, 3, 2, 2, 1, 1, 1, 1, 1]
+
+
+@pytest.fixture
+def city_age_not_different():
+    return {frozenset({1, 4}), frozenset({8, 11}), frozenset({2, 5})}
+
+
+@pytest.fixture
+def name_and_city_age_not_different():
+    return {frozenset({8, 11}), frozenset({2, 5})}
 
 
 def test_simple_attribute_equivalence_blocking(attribute_city_links):
@@ -424,3 +435,106 @@ def test_merge_blockers_om():
     mixed_blocker = msb.MixedBlocker(["Age"], ["websites"])
     actual = websites_blocker & mixed_blocker
     assert actual == expected
+
+
+def test_merge_blockers_and():
+    """Test that merging blockers does work as intended"""
+    expected = msb.AndNode(
+        msb.AttributeEquivalenceBlocker(["City"]),
+        msb.AttributeEquivalenceBlocker(["Age"], must_not_be_different=["Name"]),
+    )
+    city_blocker = msb.AttributeEquivalenceBlocker(["City"])
+    age_blocker_name_not_different = msb.AttributeEquivalenceBlocker(
+        ["Age"], must_not_be_different=["Name"]
+    )
+    actual = city_blocker & age_blocker_name_not_different
+    assert actual == expected
+
+
+def test_block_andnode(name_and_city_age_not_different):
+    """Test that the optimizations of AndNode do work as intended"""
+    expected = name_and_city_age_not_different
+    name_blocker = msb.AttributeEquivalenceBlocker(["Name"])
+    city_blocker_age_not_different = msb.AttributeEquivalenceBlocker(
+        ["City"], must_not_be_different=["Age"]
+    )
+    actual = (name_blocker & city_blocker_age_not_different).block(get_users())
+    assert actual == expected
+
+
+def test_must_not_be_different(city_age_not_different):
+    """Test that must_not_be_different does work as intended"""
+    expected = city_age_not_different
+    city_blocker_not_different_age = msb.AttributeEquivalenceBlocker(
+        ["City"], must_not_be_different=["Age"]
+    )
+    actual = city_blocker_not_different_age.block(get_users())
+    assert actual == expected
+
+
+def test_no_links_a():
+    """Test that AttributeEquivalenceBLocker gracefully outputs an empty set when no pairs are found"""
+    expected = set()
+    expected_motives = dict()
+    id_blocker = msb.AttributeEquivalenceBlocker(["id"])
+    actual = id_blocker.block(get_users())
+    assert actual == expected
+    actual_motives = id_blocker.block(get_users(), motives=True)
+    assert actual_motives == expected_motives
+
+
+def test_no_links_o():
+    """Test that OverlapBlocker gracefully outputs an empty set when no pairs are found"""
+    expected = set()
+    expected_motives = dict()
+    websites_blocker_3 = msb.OverlapBlocker(["websites"], 3)
+    actual = websites_blocker_3.block(get_users())
+    assert actual == expected
+    actual_motives = websites_blocker_3.block(get_users(), motives=True)
+    assert actual_motives == expected_motives
+
+
+def test_no_links_m():
+    """Test that MixedBlocker gracefully outputs an empty set when no pairs are found"""
+    expected = set()
+    expected_motives = dict()
+    id_blocker = msb.AttributeEquivalenceBlocker(["id"])
+    websites_blocker_3 = msb.OverlapBlocker(["websites"], 3)
+    actual = (id_blocker & websites_blocker_3).block(get_users())
+    assert actual == expected
+    actual_motives = id_blocker.block(get_users(), motives=True)
+    assert actual_motives == expected_motives
+
+
+def test_no_links_add_blocks_to_dataframe():
+    """Test that add_blocks_to_dataframe gracefully outputs an empty DataFrame when no pairs were found"""
+    expected = pd.DataFrame(columns=["id", "Name", "City", "Age", "websites", "block"])
+    expected_show_as_pairs = pd.DataFrame(
+        columns=[
+            "id_l",
+            "Name_l",
+            "City_l",
+            "Age_l",
+            "websites_l",
+            "id_r",
+            "Name_r",
+            "City_r",
+            "Age_r",
+            "websites_r",
+            "block",
+        ]
+    )
+    expected_motives = pd.DataFrame(
+        columns=["id", "Name", "City", "Age", "websites", "motive", "block"]
+    )
+    id_blocker = msb.AttributeEquivalenceBlocker(["id"])
+    links = id_blocker.block(get_users())
+    actual = msb.add_blocks_to_dataset(get_users(), links)
+    assert (actual == expected).all().all()
+    actual_show_as_pairs = msb.add_blocks_to_dataset(
+        get_users(), links, show_as_pairs=True
+    )
+    assert (actual_show_as_pairs == expected_show_as_pairs).all().all()
+    links_motives = id_blocker.block(get_users(), motives=True)
+    actual_motives = msb.add_blocks_to_dataset(get_users(), links_motives, motives=True)
+    assert (actual_motives == expected_motives).all().all()
