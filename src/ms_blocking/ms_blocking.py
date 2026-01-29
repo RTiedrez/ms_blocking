@@ -211,28 +211,36 @@ def add_motives_to_coords(coords, explanations):
     return {pair: explanations for pair in coords}
 
 
-class Node:
+class BlockerNode:
     """Abstract class from which derive all classes in the module"""
 
     def __init__(self, left=None, right=None):
         self.left = left
         self.right = right
+        self.equivalence_columns = None
+        self.overlap_columns = None
         self.overlap = None
         self.normalize = None
         self.must_not_be_different = None
         self.word_level = None
 
     def __and__(self, other):
-        return merge_blockers(self, other)
+        if self == other:
+            return self
+        else:
+            return merge_blockers(self, other)
 
     def __or__(self, other):
-        return OrNode(self, other)
+        if self == other:
+            return self
+        else:
+            return OrNode(self, other)
 
     def __repr__(self):
         return f"Node{{{self.left}, {self.right}}}"
 
 
-class AndNode(Node):
+class AndNode(BlockerNode):
     """Used to compute the intersection of the outputs of two Blockers."""
 
     def __init__(self, left, right):
@@ -258,14 +266,14 @@ class AndNode(Node):
             if id_lists
             else pd.DataFrame(columns=df.columns)
         )
-
-        coords_right = self.right.block(df_shortened, motives=motives)
+        # Rows that are in no pairs following the first blocking step cannot be in any pair of the interection
+        coords_right = self.right.block(df_shortened, motives=self.right.motives)
 
         result = merge_blocks_and(coords_left, coords_right)
         return result
 
 
-class OrNode(Node):
+class OrNode(BlockerNode):
     """Used to compute the union of the outputs of two Blockers."""
 
     def __init__(self, left, right):
@@ -278,6 +286,7 @@ class OrNode(Node):
         return self.left == other.left and self.right == other.right
 
     def block(self, df, motives=False):
+        # Note: for performance, it would be wise to remove rows that are already paired with all other rows, though this case should be pretty rare in real situations
         coords_left = self.left.block(df, motives=motives)
 
         coords_right = self.right.block(df, motives=motives)
@@ -286,7 +295,7 @@ class OrNode(Node):
         return result
 
 
-class AttributeEquivalenceBlocker(Node):  # Leaf
+class AttributeEquivalenceBlocker(BlockerNode):  # Leaf
     """To regroup rows based on equality across columns."""
 
     def __init__(
@@ -391,7 +400,7 @@ class AttributeEquivalenceBlocker(Node):  # Leaf
             return set(coords)  # set is unnnecessary
 
 
-class OverlapBlocker(Node):  # Leaf
+class OverlapBlocker(BlockerNode):  # Leaf
     """To regroup rows based on overlap of one or more columns."""
 
     def __init__(
@@ -482,7 +491,7 @@ class OverlapBlocker(Node):  # Leaf
             return set(coords)
 
 
-class MixedBlocker(Node):  # Leaf; For ANDs and RAM
+class MixedBlocker(BlockerNode):  # Leaf; For ANDs and RAM
     """Represent the intersection of an AttributeEquivalenceBlocker and an OverlapBlocker.
     Designed for performance and RAM efficiency.
     """

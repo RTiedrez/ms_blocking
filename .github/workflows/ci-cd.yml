@@ -23,9 +23,6 @@ jobs:
     - name: Install package
       run: poetry install
 
-    #- name: Install ruff
-    #  run: poetry install ruff
-
     - name: Format with ruff
       run: poetry run ruff format
 
