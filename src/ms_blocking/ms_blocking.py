@@ -147,6 +147,46 @@ def merge_blockers(left, right):
         return AndNode(left, right)
 
 
+def must_not_be_different_apply(
+    temp_data, blocking_columns, must_not_be_different_columns
+):
+    """Re-block DataFrame on a second column, where we require non-difference rather than equality"""
+
+    temp_data["block_id"] = temp_data.groupby(blocking_columns).ngroup()
+    temp_data = temp_data[temp_data["block_id"].duplicated(keep=False)]
+
+    reconstructed_data = pd.DataFrame(columns=temp_data.columns)
+    for block in temp_data["block_id"].unique():
+        # noinspection PyArgumentList
+        current_block = (
+            temp_data[temp_data["block_id"] == block]
+            .sort_values(must_not_be_different_columns)
+            .copy()
+        )
+        if (
+            len(current_block[current_block[must_not_be_different_columns].notnull()])
+            == 0
+        ):  # All nulls
+            random_string = "".join(
+                random.choices("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", k=10)
+            )  # As long as the string is not already in the column...
+            # There must be a better way to do it...
+            current_block[must_not_be_different_columns] = (
+                current_block[must_not_be_different_columns]
+                .astype(str)
+                .fillna(random_string)
+            )
+        else:
+            current_block[must_not_be_different_columns] = (
+                current_block[must_not_be_different_columns].astype(str).ffill()
+            )
+        if len(reconstructed_data) == 0:
+            reconstructed_data = current_block
+        else:
+            reconstructed_data = pd.concat([reconstructed_data, current_block])
+    return reconstructed_data
+
+
 class Node:
     """Abstract class from which derive all classes in the module"""
 
@@ -279,43 +319,11 @@ class AttributeEquivalenceBlocker(Node):  # Leaf
                 return set()
 
         if self.must_not_be_different:  # Perform a second row of blocking on a new attribute, but this time, NaNs validate the blocking condition
-            temp_data["block_id"] = temp_data.groupby(self.blocking_columns).ngroup()
-            temp_data = temp_data[temp_data["block_id"].duplicated(keep=False)]
-
-            reconstructed_data = pd.DataFrame(columns=temp_data.columns)
-            for block in temp_data["block_id"].unique():
-                # noinspection PyArgumentList
-                current_block = (
-                    temp_data[temp_data["block_id"] == block]
-                    .sort_values(self.must_not_be_different)
-                    .copy()
-                )
-                if (
-                    len(
-                        current_block[
-                            current_block[self.must_not_be_different].notnull()
-                        ]
-                    )
-                    == 0
-                ):  # All nulls
-                    random_string = "".join(
-                        random.choices("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", k=10)
-                    )  # As long as the string is not already in the column...
-                    # There must be a better way to do it...
-                    current_block[self.must_not_be_different] = (
-                        current_block[self.must_not_be_different]
-                        .astype(str)
-                        .fillna(random_string)
-                    )
-                else:
-                    current_block[self.must_not_be_different] = (
-                        current_block[self.must_not_be_different].astype(str).ffill()
-                    )
-                if len(reconstructed_data) == 0:
-                    reconstructed_data = current_block
-                else:
-                    reconstructed_data = pd.concat([reconstructed_data, current_block])
-            temp_data = reconstructed_data
+            temp_data = must_not_be_different_apply(
+                temp_data,
+                blocking_columns=self.blocking_columns,
+                must_not_be_different_columns=self.must_not_be_different,
+            )
 
             if len(temp_data) == 0:  # No pairs
                 if motives:
@@ -516,42 +524,11 @@ class MixedBlocker(Node):  # Leaf; For ANDs and RAM
                 return set()
 
         if self.must_not_be_different:  # Perform a second row of blocking on a new attribute, but this time, NaNs validate the blocking condition
-            temp_data["block_id"] = temp_data.groupby(total_columns).ngroup()
-            temp_data = temp_data[temp_data["block_id"].duplicated(keep=False)]
-
-            reconstructed_data = pd.DataFrame(columns=temp_data.columns)
-            for block in temp_data["block_id"].unique():
-                # noinspection PyArgumentList
-                current_block = (
-                    temp_data[temp_data["block_id"] == block]
-                    .sort_values(self.must_not_be_different)
-                    .copy()
-                )
-                if (
-                    len(
-                        current_block[
-                            current_block[self.must_not_be_different].notnull()
-                        ]
-                    )
-                    == 0
-                ):  # All nulls
-                    random_string = "".join(
-                        random.choices("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", k=10)
-                    )  # As long as the string is not already in the column...
-                    current_block[self.must_not_be_different] = (
-                        current_block[self.must_not_be_different]
-                        .astype(str)
-                        .fillna(random_string)
-                    )
-                else:
-                    current_block[self.must_not_be_different] = (
-                        current_block[self.must_not_be_different].astype(str).ffill()
-                    )
-                if len(reconstructed_data) == 0:
-                    reconstructed_data = current_block
-                else:
-                    reconstructed_data = pd.concat([reconstructed_data, current_block])
-            temp_data = reconstructed_data
+            temp_data = must_not_be_different_apply(
+                temp_data,
+                blocking_columns=total_columns,
+                must_not_be_different_columns=self.must_not_be_different,
+            )
 
         groups_equivalence = temp_data.groupby(self.equivalence_columns).apply(
             lambda x: frozenset(x.index), include_groups=False
