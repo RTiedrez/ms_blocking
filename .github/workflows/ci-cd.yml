@@ -23,11 +23,14 @@ jobs:
     - name: Install package
       run: poetry install
 
+    #- name: Install ruff
+    #  run: poetry install ruff
+
     - name: Format with ruff
-      run: ruff format
+      run: poetry run ruff format
 
     - name: Test with pytest
-      run: poetry run pytest tests/ --cov=pycounts --cov-report=xml
+      run: poetry run pytest tests/ --cov=pycounts --cov-report=html
 
     - name: Build documentation
       run: poetry run make html --directory docs/
@@ -48,18 +51,18 @@ jobs:
 
     # Define job steps
     steps:
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v2
-        with:
-          python-version: 3.12
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.12
 
-      - name: Check-out repository
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
+    - name: Check-out repository
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
 
-      #- name: Use Python Semantic Release to prepare release
-      #  id: release
-      #  uses: python-semantic-release/python-semantic-release@v8.3.0
-      #  with:
-      #    github_token: ${{ secrets.GITHUB_TOKEN }}
+    #- name: Use Python Semantic Release to prepare release
+    #  id: release
+    #  uses: python-semantic-release/python-semantic-release@v8.3.0
+    #  with:
+    #    github_token: ${{ secrets.GITHUB_TOKEN }}
