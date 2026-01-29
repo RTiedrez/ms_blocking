@@ -186,14 +186,13 @@ def must_not_be_different_apply(
             reconstructed_data = pd.concat([reconstructed_data, current_block])
     return reconstructed_data
 
+
 def block_overlap(groups, overlap):
     coords = {
-        frozenset(pair)
-        for group_list in groups
-        for pair in combinations(group_list, 2)
+        frozenset(pair) for group_list in groups for pair in combinations(group_list, 2)
     }
 
-    if overlap>1:
+    if overlap > 1:
         coords = [  # In this specific case, we want to keep duplicates to track the number of occurences of a pair
             frozenset(pair)
             for group_list in groups
@@ -207,8 +206,10 @@ def block_overlap(groups, overlap):
 
     return coords
 
+
 def add_motives_to_coords(coords, explanation):
     return {pair: {explanation} for pair in coords}
+
 
 class Node:
     """Abstract class from which derive all classes in the module"""
@@ -559,5 +560,6 @@ class MixedBlocker(Node):  # Leaf; For ANDs and RAM
             return add_motives_to_coords(coords, explanation)
         else:
             return set(coords)
+
 
 # /!\ TODO: make class for motives (+ pair, motive dict)?
