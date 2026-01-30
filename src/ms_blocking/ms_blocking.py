@@ -30,6 +30,12 @@ class BlockerNode:
     def __repr__(self):
         return f"Node{{{self.left}, {self.right}}}"
 
+    def __eq__(self, other):
+        if not isinstance(other, BlockerNode):
+            return False
+        else:
+            return self.left == other.left and self.right == other.right
+
 
 class AndNode(BlockerNode):
     """Used to compute the intersection of the outputs of two Blockers."""
@@ -39,9 +45,6 @@ class AndNode(BlockerNode):
 
     def __repr__(self):
         return f"AndNode{{{self.left}, {self.right}}}"
-
-    def __eq__(self, other):
-        return self.left == other.left and self.right == other.right
 
     def block(self, df, motives=False):
         # In order not to perform redundant computations, we first filter out the rows that were not considered by the first blocker before running the second blocker
@@ -73,8 +76,6 @@ class OrNode(BlockerNode):
     def __repr__(self):
         return f"OrNode{{{self.left}, {self.right}}}"
 
-    def __eq__(self, other):
-        return self.left == other.left and self.right == other.right
 
     def block(self, df, motives=False):
         # Note: for performance, it would be wise to remove rows that are already paired with all other rows, though this case should be pretty rare in real situations
@@ -591,6 +592,3 @@ def merge_blockers(
         )
     else:
         return AndNode(left, right)
-
-
-# /!\ TODO: make class for motives (+ pair, motive dict)?
