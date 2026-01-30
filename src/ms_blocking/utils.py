@@ -5,7 +5,10 @@ from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import connected_components
 import pandas as pd
 import networkx as nx
+import random
+from collections import Counter
 
+from itertools import combinations
 from typing import List, Set, Iterable, Dict, Collection, Any
 
 Columns = List[str]
@@ -21,14 +24,14 @@ _SPACE_RE = re.compile(r"\s+")
 def remove_rows_if_value_appears_only_once(
     data: pd.DataFrame, cols: Columns
 ) -> pd.DataFrame:
-    """Drops rows of a Pandas DataFrame where a certain column's values appears only once.
+    """Drop rows of a Pandas DataFrame where a certain column's values appears only once.
 
     Ensures all elements of provided columns appear at least twice in their column
 
     Parameters
     ----------
     data : DataFrame
-      The DataFrame to preprocess
+      DataFrame to preprocess
 
     cols : List[str]
       List of columns where rows that contain non-duplicated elements shall be discarded
@@ -131,7 +134,7 @@ def normalize_function(string: Any) -> Any:
     Parameters
     ----------
     string : Any
-      The text to preprocess
+        Text to preprocess
 
     Returns
     -------
@@ -160,7 +163,7 @@ def normalize(text: Any) -> Any:
     Parameters
     ----------
     text : Any
-      The text(s) to preprocess
+      Text(s) to preprocess
 
     Returns
     -------
@@ -191,7 +194,7 @@ def flatten(list_of_iterables_: Collection[Iterable]) -> List[Any] | None:
     Parameters
     ----------
     list_of_iterables_ : Collection[Iterable]
-      The list to flatten
+      List to flatten
 
     Returns
     -------
@@ -338,17 +341,6 @@ def add_blocks_to_dataset(
         id_l rank_l  id_r rank_r  block
        0     0  first     2  first      0
     """
-    if output_columns is None:
-        output_columns = data.columns
-    data = data[output_columns].copy()
-
-    if "motive" in data.columns:
-        print("Renaming 'motive' column to 'motive_old'")
-        data = data.rename(columns={"motive": "motive_old"})
-
-    if "block" in data.columns:
-        print("Renaming 'block' column to 'block_old'")
-        data = data.rename(columns={"block": "block_old"})
 
     if show_as_pairs and keep_ungrouped_rows:
         raise ValueError("Cannot both return pairs and keep ungrouped rows")
@@ -360,6 +352,19 @@ def add_blocks_to_dataset(
     # Ensure the index is a unique identifier
     if not data.index.is_unique:
         raise ValueError("DataFrame index must be unique to be used as an identifier.")
+
+    if "_motive" in data.columns:
+        if motives:
+            raise ValueError(
+                "Please rename existing '_motive' column OR do not pass 'motives=True'"
+            )
+
+    if "_block" in data.columns:
+        raise ValueError("Please rename existing '_block' column")
+
+    if output_columns is None:
+        output_columns = data.columns
+    data = data[output_columns].copy()
 
     if len(coords) == 0 and not keep_ungrouped_rows:  # Empty graph
         if show_as_pairs:
@@ -411,16 +416,16 @@ def add_blocks_to_dataset(
                 output_data = pd.concat([output_data, current_row])
 
         # Assign blocks to rows based on their original index
-        output_data["block"] = output_data.index.map(matcher)
+        output_data["_block"] = output_data.index.map(matcher)
         if not merge_blocks:
-            output_data = output_data.explode("block")
+            output_data = output_data.explode("_block")
 
         if keep_ungrouped_rows:
-            output_data["block"] = output_data["block"].fillna(-1)
+            output_data["_block"] = output_data["_block"].fillna(-1)
             matcher_ungrouped_rows = {}
             block_temp = []
             i = 0  # Track # of blocks processed
-            for b in output_data["block"]:
+            for b in output_data["_block"]:
                 if b == -1:
                     block_temp.append(i)
                     i += 1
@@ -430,19 +435,19 @@ def add_blocks_to_dataset(
                     i += 1
                 else:
                     block_temp.append(matcher_ungrouped_rows[b])
-            output_data["block"] = block_temp
+            output_data["_block"] = block_temp
         else:
             if not show_as_pairs:
                 output_data = output_data[
-                    output_data["block"].duplicated(keep=False)
-                    & output_data["block"].notna()
+                    output_data["_block"].duplicated(keep=False)
+                    & output_data["_block"].notna()
                 ]
 
-        output_data.loc[:, ["block"]] = start_from_zero(output_data["block"])
+        output_data.loc[:, ["_block"]] = start_from_zero(output_data["_block"])
 
         if sort:
             # Sort by block, then by original index
-            sort_cols = ["block"]
+            sort_cols = ["_block"]
             if output_data.index.name:
                 output_data = output_data.sort_values(
                     sort_cols + [output_data.index.name]
@@ -456,7 +461,7 @@ def add_blocks_to_dataset(
                 output_data = output_data.set_index(output_data.columns[0])
 
     if motives:
-        output_data["motive"] = ""
+        output_data["_motive"] = ""
         id_list = flatten(coords.keys())
         motive_matcher = {
             row_id: frozenset(
@@ -467,13 +472,14 @@ def add_blocks_to_dataset(
             )
             for row_id in id_list
         }
-        output_data["motive"] = output_data.index.map(motive_matcher)
+        output_data["_motive"] = output_data.index.map(motive_matcher)
 
-    if "block" not in output_data.columns:  # Empty coords
-        output_data["block"] = -1
+    if "_block" not in output_data.columns:  # Empty coords
+        output_data["_block"] = -1
 
     output_data = output_data.reset_index(drop=True)
-    output_data["block"] = output_data["block"].astype(int)
+    output_data["_block"] = output_data["_block"].astype(int)
+
     return output_data
 
 
@@ -502,7 +508,7 @@ def parse_list(s: str | List, word_level: bool = False) -> List[str]:
     Parameters
     ----------
     s : str
-      The stringified representation of a list e.g. "['string 1', 'string 2', ...]"
+      Stringified representation of a list e.g. "['string 1', 'string 2', ...]"
 
     word_level : bool
       Whether to return a list of all words within s instead of a list of each comma-separated element
@@ -510,7 +516,7 @@ def parse_list(s: str | List, word_level: bool = False) -> List[str]:
     Returns
     -------
     List[str]
-      A python list based on s
+      s turned into a List
 
     Examples
     --------
@@ -546,16 +552,17 @@ def parse_list(s: str | List, word_level: bool = False) -> List[str]:
     else:
         return [s for s in cleaned_items if len(s) > 0]
 
-def scoring(data: pd.DataFrame, motives_column: str="motive") -> pd.Series:
+
+def scoring(data: pd.DataFrame, motives_column: str = "_motive") -> pd.Series:
     """Add a score to a blocked DataFrame based on the number of motives
 
     Parameters
     ----------
     data : DataFrame
-      A DataFrame with motives
+      DataFrame with motives
 
     motives_column : str
-      The name of the column containing the motives
+      Name of the column containing the motives
 
     Returns
     -------
@@ -565,7 +572,12 @@ def scoring(data: pd.DataFrame, motives_column: str="motive") -> pd.Series:
 
     # Check that we do have motives
     if motives_column not in data.columns:
-        raise ValueError(f"Specified motives column \"{motives_column}\" does not exist")
+        if motives_column == "_motive":
+            raise ValueError("No motives in DataFrame")
+        else:
+            raise ValueError(
+                f'Specified motives column "{motives_column}" does not exist'
+            )
 
     if "score" in data.columns:
         print("Renaming 'score' column to 'score_old'")
@@ -573,3 +585,136 @@ def scoring(data: pd.DataFrame, motives_column: str="motive") -> pd.Series:
 
     scores = data[motives_column].apply(len)
     return scores
+
+
+def must_not_be_different_apply(  # WIP
+    temp_data: pd.DataFrame,
+    blocking_columns: List[str],
+    must_not_be_different_columns: List[str],
+):
+    """Re-block DataFrame on a second column, where we require non-difference rather than equality
+
+    Parameters
+    ----------
+    temp_data : DataFrame
+      Partially blocked DataFrame
+
+    blocking_columns : List[str]
+      Columns where we check for equality
+
+    must_not_be_different_columns : List[str]
+        Columns where we only check for non-difference
+
+    Returns
+    -------
+    DataFrame
+      Column of scores
+    """
+
+    series_block_id = temp_data.groupby(blocking_columns).ngroup()
+    temp_data = temp_data[series_block_id.duplicated(keep=False)]
+
+    reconstructed_data = pd.DataFrame(columns=temp_data.columns)
+    for block in series_block_id.unique():
+        # noinspection PyArgumentList
+        current_block = (
+            temp_data[series_block_id == block]
+            .sort_values(must_not_be_different_columns)
+            .copy()
+        )
+        if (
+            len(current_block[current_block[must_not_be_different_columns].notnull()])
+            == 0
+        ):  # All nulls
+            random_string = "".join(
+                random.choices("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", k=10)
+            )  # As long as the string is not already in the column...
+            # There must be a better way to do it...
+            current_block[must_not_be_different_columns] = (
+                current_block[must_not_be_different_columns]
+                .astype(str)
+                .fillna(random_string)
+            )
+        else:
+            current_block[must_not_be_different_columns] = (
+                current_block[must_not_be_different_columns].astype(str).ffill()
+            )
+        if len(reconstructed_data) == 0:
+            reconstructed_data = current_block
+        else:
+            reconstructed_data = pd.concat([reconstructed_data, current_block])
+
+    return reconstructed_data
+
+
+def block_overlap(groups: Iterable, overlap: int = 1) -> Coords:
+    """Block a DataFrame based on overlap accross columns
+
+    Parameters
+    ----------
+    groups : Iterable
+      Output of a groupby
+
+    overlap : int
+      Minimum passing overlap
+
+    Returns
+    -------
+    Coords
+      Pairs obtained by blocking
+    """
+    coords = {
+        frozenset(pair) for group_list in groups for pair in combinations(group_list, 2)
+    }
+
+    if overlap > 1:
+        coords = [  # In this specific case, we want to keep duplicates to track the number of occurences of each pair
+            frozenset(pair)
+            for group_list in groups
+            for pair in combinations(group_list, 2)
+        ]
+        # Filter pairs that fulfill the minimum overlap condition
+        occurences_dict = Counter(coords)
+        coords = {
+            p for p in occurences_dict if occurences_dict[p] >= overlap
+        }  # The collection of pairs that fulfill the overlap condition
+
+    return coords
+
+
+def add_motives_to_coords(coords: Coords, explanations: Set[str]) -> CoordsMotives:
+    """Block a DataFrame based on overlap accross columns
+
+    Parameters
+    ----------
+    coords : Coords
+      Coords obtained by blocking
+
+    explanations : Set[str]
+      Set of explanations
+
+    Returns
+    -------
+    CoordsMotives
+      Pairs obtained by blocking
+
+    Examples
+    --------
+    >>> add_motives_to_coords({
+        frozenset({1, 4}),
+        frozenset({8, 11}),
+        frozenset({2, 5}),
+        frozenset({10, 13}),
+        frozenset({3, 8}),
+        frozenset({3, 11}),
+    }, {"Same 'City'"}')
+    {
+        frozenset({1, 4}): {"Same 'City'"},
+        frozenset({8, 11}): {"Same 'City'"},
+        frozenset({2, 5}): {"Same 'City'"},
+        frozenset({10, 13}): {"Same 'City'"},
+        frozenset({3, 8}): {"Same 'City'"},
+        frozenset({3, 11}): {"Same 'City'"},
+    }
+    """
+    return {pair: explanations for pair in coords}

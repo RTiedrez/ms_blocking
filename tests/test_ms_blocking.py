@@ -105,7 +105,7 @@ def attribute_city_show_as_pairs_true_id():
 
 @pytest.fixture
 def attribute_city_show_as_pairs_true_columns():
-    return ["id_l", "Name_l", "id_r", "Name_r", "block"]
+    return ["id_l", "Name_l", "id_r", "Name_r", "_block"]
 
 
 @pytest.fixture
@@ -183,7 +183,7 @@ def test_merge_blocks(overlap_websites_merge_blocks):
     websites_blocker = msb.OverlapBlocker(["websites"])
     links = websites_blocker.block(get_users())
     actual = msb.add_blocks_to_dataset(get_users(), links, merge_blocks=False)[
-        "block"
+        "_block"
     ].to_list()
     assert actual == expected, (
         "Blocking on websites should return [0, 0, 0, 1, 1, 2, 2, 2]"
@@ -240,7 +240,7 @@ def test_sort_false(attribute_city_sort_false_blocks):
     city_blocker = msb.AttributeEquivalenceBlocker(["City"])
     links = city_blocker.block(get_users())
     actual = msb.add_blocks_to_dataset(get_users(), links, sort=False)[
-        "block"
+        "_block"
     ].to_list()
     assert actual == expected, (
         "Blocking on websites and adding blocks with sort=False should return [0, 1, 2, 0, 1, 2, 3, 2, 3]"
@@ -253,7 +253,7 @@ def test_keep_ungrouped_rows_false(attribute_city_keep_ungrouped_rows_false):
     city_blocker = msb.AttributeEquivalenceBlocker(["City"])
     links = city_blocker.block(get_users())
     actual = msb.add_blocks_to_dataset(get_users(), links, keep_ungrouped_rows=True)[
-        "block"
+        "_block"
     ].to_list()
     assert actual == expected, (
         "Blocking on Name with normalize_strings=False should return [0, 1, 1, 2, 2, 3, 3, 3, 4, 5, 6, 7, 7, 8]"
@@ -274,7 +274,7 @@ def test_motives_when_adding_to_dataframe(attribute_city_motives_true_add):
     city_blocker = msb.AttributeEquivalenceBlocker(["City"])
     links = city_blocker.block(get_users(), motives=True)
     actual = msb.add_blocks_to_dataset(get_users(), links, motives=True)[
-        "motive"
+        "_motive"
     ].to_list()
     assert actual == expected
 
@@ -337,7 +337,7 @@ def test_pipelining_motives(city_age_websites_pipelining_motives):
     links = final_blocker.block(get_users(), motives=True)
     actual = msb.add_blocks_to_dataset(
         get_users(), links, show_as_pairs=True, motives=True, merge_blocks=False
-    )["motive"].to_list()
+    )["_motive"].to_list()
     assert actual == expected
 
 
@@ -508,7 +508,7 @@ def test_no_links_m():
 
 def test_no_links_add_blocks_to_dataframe():
     """Test that add_blocks_to_dataframe gracefully outputs an empty DataFrame when no pairs were found"""
-    expected = pd.DataFrame(columns=["id", "Name", "City", "Age", "websites", "block"])
+    expected = pd.DataFrame(columns=["id", "Name", "City", "Age", "websites", "_block"])
     expected_show_as_pairs = pd.DataFrame(
         columns=[
             "id_l",
@@ -521,11 +521,11 @@ def test_no_links_add_blocks_to_dataframe():
             "City_r",
             "Age_r",
             "websites_r",
-            "block",
+            "_block",
         ]
     )
     expected_motives = pd.DataFrame(
-        columns=["id", "Name", "City", "Age", "websites", "motive", "block"]
+        columns=["id", "Name", "City", "Age", "websites", "_motive", "_block"]
     )
     id_blocker = msb.AttributeEquivalenceBlocker(["id"])
     links = id_blocker.block(get_users())
