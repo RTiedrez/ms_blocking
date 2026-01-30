@@ -5,7 +5,10 @@ from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import connected_components
 import pandas as pd
 import networkx as nx
+import random
+from collections import Counter
 
+from itertools import combinations
 from typing import List, Set, Iterable, Dict, Collection, Any
 
 Columns = List[str]
@@ -21,14 +24,14 @@ _SPACE_RE = re.compile(r"\s+")
 def remove_rows_if_value_appears_only_once(
     data: pd.DataFrame, cols: Columns
 ) -> pd.DataFrame:
-    """Drops rows of a Pandas DataFrame where a certain column's values appears only once.
+    """Drop rows of a Pandas DataFrame where a certain column's values appears only once.
 
     Ensures all elements of provided columns appear at least twice in their column
 
     Parameters
     ----------
     data : DataFrame
-      The DataFrame to preprocess
+      DataFrame to preprocess
 
     cols : List[str]
       List of columns where rows that contain non-duplicated elements shall be discarded
@@ -131,7 +134,7 @@ def normalize_function(string: Any) -> Any:
     Parameters
     ----------
     string : Any
-      The text to preprocess
+        Text to preprocess
 
     Returns
     -------
@@ -160,7 +163,7 @@ def normalize(text: Any) -> Any:
     Parameters
     ----------
     text : Any
-      The text(s) to preprocess
+      Text(s) to preprocess
 
     Returns
     -------
@@ -191,7 +194,7 @@ def flatten(list_of_iterables_: Collection[Iterable]) -> List[Any] | None:
     Parameters
     ----------
     list_of_iterables_ : Collection[Iterable]
-      The list to flatten
+      List to flatten
 
     Returns
     -------
@@ -502,7 +505,7 @@ def parse_list(s: str | List, word_level: bool = False) -> List[str]:
     Parameters
     ----------
     s : str
-      The stringified representation of a list e.g. "['string 1', 'string 2', ...]"
+      Stringified representation of a list e.g. "['string 1', 'string 2', ...]"
 
     word_level : bool
       Whether to return a list of all words within s instead of a list of each comma-separated element
@@ -556,7 +559,7 @@ def scoring(data: pd.DataFrame, motives_column: str = "motive") -> pd.Series:
       A DataFrame with motives
 
     motives_column : str
-      The name of the column containing the motives
+      Name of the column containing the motives
 
     Returns
     -------
@@ -574,3 +577,134 @@ def scoring(data: pd.DataFrame, motives_column: str = "motive") -> pd.Series:
 
     scores = data[motives_column].apply(len)
     return scores
+
+
+def must_not_be_different_apply(  # WIP
+    temp_data: pd.DataFrame,
+    blocking_columns: List[str],
+    must_not_be_different_columns: List[str],
+):
+    """Re-block DataFrame on a second column, where we require non-difference rather than equality
+
+    Parameters
+    ----------
+    temp_data : DataFrame
+      Partially blocked DataFrame
+
+    blocking_columns : List[str]
+      Columns where we check for equality
+
+    must_not_be_different_columns : List[str]
+        Columns where we only check for non-difference
+
+    Returns
+    -------
+    pd.DataFrame
+      A column of scores
+    """
+    temp_data["block_id"] = temp_data.groupby(blocking_columns).ngroup()
+    temp_data = temp_data[temp_data["block_id"].duplicated(keep=False)]
+
+    reconstructed_data = pd.DataFrame(columns=temp_data.columns)
+    for block in temp_data["block_id"].unique():
+        # noinspection PyArgumentList
+        current_block = (
+            temp_data[temp_data["block_id"] == block]
+            .sort_values(must_not_be_different_columns)
+            .copy()
+        )
+        if (
+            len(current_block[current_block[must_not_be_different_columns].notnull()])
+            == 0
+        ):  # All nulls
+            random_string = "".join(
+                random.choices("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", k=10)
+            )  # As long as the string is not already in the column...
+            # There must be a better way to do it...
+            current_block[must_not_be_different_columns] = (
+                current_block[must_not_be_different_columns]
+                .astype(str)
+                .fillna(random_string)
+            )
+        else:
+            current_block[must_not_be_different_columns] = (
+                current_block[must_not_be_different_columns].astype(str).ffill()
+            )
+        if len(reconstructed_data) == 0:
+            reconstructed_data = current_block
+        else:
+            reconstructed_data = pd.concat([reconstructed_data, current_block])
+    return reconstructed_data
+
+
+def block_overlap(groups: Iterable, overlap: int = 1) -> Coords:
+    """Block a DataFrame based on overlap accross columns
+
+    Parameters
+    ----------
+    groups : Iterable
+      Output of a groupby
+
+    overlap : int
+      Minimum passing overlap
+
+    Returns
+    -------
+    Coords
+      Pairs obtained by blocking
+    """
+    coords = {
+        frozenset(pair) for group_list in groups for pair in combinations(group_list, 2)
+    }
+
+    if overlap > 1:
+        coords = [  # In this specific case, we want to keep duplicates to track the number of occurences of each pair
+            frozenset(pair)
+            for group_list in groups
+            for pair in combinations(group_list, 2)
+        ]
+        # Filter pairs that fulfill the minimum overlap condition
+        occurences_dict = Counter(coords)
+        coords = {
+            p for p in occurences_dict if occurences_dict[p] >= overlap
+        }  # The collection of pairs that fulfill the overlap condition
+
+    return coords
+
+
+def add_motives_to_coords(coords: Coords, explanations: Set[str]) -> CoordsMotives:
+    """Block a DataFrame based on overlap accross columns
+
+    Parameters
+    ----------
+    coords : Coords
+      Coords obtained by blocking
+
+    explanations : Set[str]
+      Set of explanations
+
+    Returns
+    -------
+    CoordsMotives
+      Pairs obtained by blocking
+
+    Examples
+    --------
+    >>> add_motives_to_coords({
+        frozenset({1, 4}),
+        frozenset({8, 11}),
+        frozenset({2, 5}),
+        frozenset({10, 13}),
+        frozenset({3, 8}),
+        frozenset({3, 11}),
+    }, {"Same 'City'"}')
+    {
+        frozenset({1, 4}): {"Same 'City'"},
+        frozenset({8, 11}): {"Same 'City'"},
+        frozenset({2, 5}): {"Same 'City'"},
+        frozenset({10, 13}): {"Same 'City'"},
+        frozenset({3, 8}): {"Same 'City'"},
+        frozenset({3, 11}): {"Same 'City'"},
+    }
+    """
+    return {pair: explanations for pair in coords}
