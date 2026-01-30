@@ -1,9 +1,6 @@
 from ms_blocking.utils import *  # noqa: F403
 
 
-# TODO: "block_id"
-
-
 class BlockerNode:
     """Abstract class from which derive all classes in the module"""
 
