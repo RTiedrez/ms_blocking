@@ -294,7 +294,6 @@ def merge_blocks_or(coords_1: Coords, coords_2: Coords) -> Coords:
         }
     else:
         return coords_1.union(coords_2)
-    # TODO: check for merging one with motive and one w/o
 
 
 def merge_blocks_and(coords_1: Coords, coords_2: Coords) -> Coords:
