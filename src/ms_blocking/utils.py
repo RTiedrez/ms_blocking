@@ -4,17 +4,53 @@ import re
 from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import connected_components
 import pandas as pd
-import networkx as nx
 import random
 from collections import Counter
 
 from itertools import combinations
 from typing import List, Set, Iterable, Dict, Collection, Any
 
+
+class EquivalenceMotive:
+    def __init__(self, blocking_columns):
+        self.blocking_columns = blocking_columns
+
+    def __eq__(self, other):
+        return self.blocking_columns == other.blocking_columns
+
+    def __repr__(self):
+        return ", ".join(
+            [f"Same '{column_name}'" for column_name in self.blocking_columns]
+        )
+
+
+class OverlapMotive:
+    def __init__(self, blocking_columns, overlap=1, word_level=False):
+        self.blocking_columns = blocking_columns
+        self.overlap = overlap
+        self.word_level = word_level
+
+    def __eq__(self, other):
+        return (
+            self.blocking_columns == other.blocking_columns
+            and self.overlap == other.overlap
+            and self.word_level == other.word_level
+        )
+
+    def __repr__(self):
+        return ", ".join(
+            [
+                f">={self.overlap}{' word_level' if self.word_level else ''} overlap in '{column_name}'"
+                for column_name in self.blocking_columns
+            ]
+        )
+
+
 Columns = List[str]
 Pair = Collection[int]
+Motive = EquivalenceMotive | OverlapMotive
 CoordsBasic = Set[Pair]
-CoordsMotives = Dict[Pair, Set[str]]
+CoordsMotives = Dict[Pair, List[Motive]]
 Coords = CoordsBasic | CoordsMotives
 
 _PUNCT_RE = re.compile(r'[!"#$%&()*+,-./:;<=>?@\[\\\]^_`{|}~]')
@@ -240,7 +276,7 @@ def merge_blocks_or(coords_1: Coords, coords_2: Coords) -> Coords:
     if type(coords_1) is type(coords_2) is dict:  # We have motives
         return {
             pair: (
-                (coords_1[pair] | coords_2[pair])
+                (coords_1[pair] + coords_2[pair])
                 if (pair in coords_1 and pair in coords_2)
                 else coords_1[pair]
                 if (pair in coords_1)
@@ -278,226 +314,13 @@ def merge_blocks_and(coords_1: Coords, coords_2: Coords) -> Coords:
     """
     if type(coords_1) is type(coords_2) is dict:  # We have motives
         return {
-            pair: (coords_1[pair] | coords_2[pair])
+            pair: (coords_1[pair] + coords_2[pair])
             for y in (coords_1, coords_2)
             for pair in y.keys()
             if (pair in coords_1 and pair in coords_2)
         }
     else:
         return coords_1.intersection(coords_2)
-
-
-def add_blocks_to_dataset(
-    data: pd.DataFrame,
-    coords: Coords,
-    sort: bool = True,
-    keep_ungrouped_rows: bool = False,
-    merge_blocks: bool = True,
-    motives: bool = False,
-    show_as_pairs: bool = False,
-    output_columns: Columns = None,
-) -> pd.DataFrame:
-    """Returns the intersection of an array of links
-
-    Takes two lists of paired elements, with or without motives, returns their intersection
-
-    Parameters
-    ----------
-       data : DataFrame
-           DataFrame for blocking
-       coords : Array
-           Blocked coordinates
-       sort : bool
-           Whether to sort the result by block, thereby regrouping rows of the same block
-       keep_ungrouped_rows : bool
-           Whether to display rows that do not belong to any block
-       merge_blocks : bool
-           Whether to merge transitively merge blocks
-       motives : bool
-           Whether to display the reason behind each block
-       show_as_pairs : bool
-           Whether to show the output as pairs or rows rather than simply reordering the initial DataFrame
-       output_columns : list
-           Columns to show. Useful in combination with show_as_pairs as column names are altered
-
-    Returns
-    -------
-    DataFrame
-      Blocked DataFrame
-
-    Examples
-    --------
-    >>> add_blocks_to_dataset(data=pd.DataFrame(
-       [
-           [0, 'first', 4],
-           [1, 'second', 6],
-           [2, 'first', 2],
-           [3, 'third', 5]
-       ],
-       columns=['id', 'rank', 'score']),
-       coords=np.array([{0, 2}]),
-       show_as_pairs=True,
-       output_columns=['id', 'rank'])
-        id_l rank_l  id_r rank_r  block
-       0     0  first     2  first      0
-    """
-
-    if show_as_pairs and keep_ungrouped_rows:
-        raise ValueError("Cannot both return pairs and keep ungrouped rows")
-
-    if motives:
-        if type(coords) is not dict:
-            raise TypeError("Cannot specify motives=True without passing motives")
-
-    # Ensure the index is a unique identifier
-    if not data.index.is_unique:
-        raise ValueError("DataFrame index must be unique to be used as an identifier.")
-
-    if "_motive" in data.columns:
-        if motives:
-            raise ValueError(
-                "Please rename existing '_motive' column OR do not pass 'motives=True'"
-            )
-
-    if "_block" in data.columns:
-        raise ValueError("Please rename existing '_block' column")
-
-    if output_columns is None:
-        output_columns = data.columns
-    data = data[output_columns].copy()
-
-    if len(coords) == 0 and not keep_ungrouped_rows:  # Empty graph
-        if show_as_pairs:
-            columns = [col + "_l" for col in data.columns] + [
-                col + "_r" for col in data.columns
-            ]
-            output_data = pd.DataFrame(columns=columns)
-        else:
-            output_data = pd.DataFrame(columns=data.columns)
-    else:
-        output_data = data
-        # Map coords to connected component labels
-        if merge_blocks:  # We solve the connected components problem
-            cc_labels = solve_connected_components_from_coords(coords)
-            # Match original index to new block ID
-            matcher = {
-                idx: label
-                for idx, label in enumerate(cc_labels)
-                if label != -1 and idx in data.index
-            }
-        else:  # We solve the cliques problem
-            g = nx.Graph()
-            # noinspection PyTypeChecker
-            g.add_edges_from(coords)
-            complete_subgraphs = list(nx.find_cliques(g))
-            complete_subgraphs = sorted(complete_subgraphs)
-            # matcher = {row_id:([i for i in range(len(complete_subgraphs)) if row_id in complete_subgraphs[i]]) for row_id in set(flatten(complete_subgraphs))}
-            matcher = dict()
-            for i, clique in enumerate(complete_subgraphs):
-                for node_idx in clique:
-                    if node_idx in matcher.keys():
-                        matcher[node_idx].append(i)
-                    else:
-                        matcher[node_idx] = [i]
-
-        if show_as_pairs:
-            output_data = pd.DataFrame()
-            for pair in coords:
-                left_row = data.loc[[tuple(pair)[0]]].copy()
-                current_index = left_row.index
-                right_row = data.loc[[tuple(pair)[1]]].copy()
-                left_row.columns = [col + "_l" for col in left_row.columns]
-                right_row.columns = [col + "_r" for col in right_row.columns]
-                current_row = pd.concat(
-                    [left_row.reset_index(drop=True), right_row.reset_index(drop=True)],
-                    axis=1,
-                )
-                current_row.index = current_index
-                output_data = pd.concat([output_data, current_row])
-
-        # Assign blocks to rows based on their original index
-        output_data["_block"] = output_data.index.map(matcher)
-        if not merge_blocks:
-            output_data = output_data.explode("_block")
-
-        if keep_ungrouped_rows:
-            output_data["_block"] = output_data["_block"].fillna(-1)
-            matcher_ungrouped_rows = {}
-            block_temp = []
-            i = 0  # Track # of blocks processed
-            for b in output_data["_block"]:
-                if b == -1:
-                    block_temp.append(i)
-                    i += 1
-                elif b not in matcher_ungrouped_rows:
-                    matcher_ungrouped_rows[b] = i
-                    block_temp.append(i)
-                    i += 1
-                else:
-                    block_temp.append(matcher_ungrouped_rows[b])
-            output_data["_block"] = block_temp
-        else:
-            if not show_as_pairs:
-                output_data = output_data[
-                    output_data["_block"].duplicated(keep=False)
-                    & output_data["_block"].notna()
-                ]
-
-        output_data.loc[:, ["_block"]] = start_from_zero(output_data["_block"])
-
-        if sort:
-            # Sort by block, then by original index
-            sort_cols = ["_block"]
-            if output_data.index.name:
-                output_data = output_data.sort_values(
-                    sort_cols + [output_data.index.name]
-                )
-            else:
-                # If no named index, use the first column of the DataFrame
-                output_data = output_data.reset_index()
-                output_data = output_data.sort_values(
-                    sort_cols + [output_data.columns[0]]
-                )
-                output_data = output_data.set_index(output_data.columns[0])
-
-    if motives:
-        output_data["_motive"] = ""
-        id_list = flatten(coords.keys())
-        motive_matcher = {
-            row_id: frozenset(
-                reason
-                for pair in coords.keys()
-                if row_id in pair
-                for reason in coords[pair]
-            )
-            for row_id in id_list
-        }
-        output_data["_motive"] = output_data.index.map(motive_matcher)
-
-    if "_block" not in output_data.columns:  # Empty coords
-        output_data["_block"] = -1
-
-    output_data = output_data.reset_index(drop=True)
-    output_data["_block"] = output_data["_block"].astype(int)
-
-    return output_data
-
-
-def generate_blocking_report(
-    data: pd.DataFrame, coords: Coords, output_columns: Collection[str] = None
-) -> pd.DataFrame:
-    """
-    Shorthand for add_blocks_to_dataset with below arguments
-    """
-    return add_blocks_to_dataset(
-        data,
-        coords,
-        sort=True,
-        merge_blocks=False,
-        motives=True,
-        show_as_pairs=True,
-        output_columns=output_columns,
-    )
 
 
 def parse_list(s: str | List, word_level: bool = False) -> List[str]:
@@ -682,7 +505,9 @@ def block_overlap(groups: Iterable, overlap: int = 1) -> Coords:
     return coords
 
 
-def add_motives_to_coords(coords: Coords, explanations: Set[str]) -> CoordsMotives:
+def add_motives_to_coords(
+    coords: Coords, explanations: List[Motive]
+) -> Dict[Pair, List[Motive]]:
     """Block a DataFrame based on overlap accross columns
 
     Parameters
@@ -690,7 +515,7 @@ def add_motives_to_coords(coords: Coords, explanations: Set[str]) -> CoordsMotiv
     coords : Coords
       Coords obtained by blocking
 
-    explanations : Set[str]
+    explanations : Set[EquivalenceMotive|OverlapMotive]
       Set of explanations
 
     Returns
@@ -718,3 +543,66 @@ def add_motives_to_coords(coords: Coords, explanations: Set[str]) -> CoordsMotiv
     }
     """
     return {pair: explanations for pair in coords}
+
+
+def solve_motives(motives: List[Motive]) -> List[Motive]:
+    """Remove duplicated and redundant motives from a list of motives
+
+    Redundant motives refer to OverlapMotives on the same column(s) but with different overlap or word-level condition
+
+    Parameters
+    ----------
+    motives : List[Motive]
+      Coords obtained by blocking
+
+    Returns
+    -------
+    List[Motive]
+      Pairs obtained by blocking
+
+    Examples
+    --------
+    >>> solve_motives([OverlapMotive(['websites'], 1), OverlapMotive(['websites'], 2), OverlapMotive(['websites'], 2, word_level=False)])
+    OverlapMotive(['websites'], 2, word_level=False)
+    """
+    if not motives:
+        raise ValueError("Motives must not be empty")
+
+    final_motives = [motives[0]]
+    for motive in motives[1:]:
+        if motive not in final_motives:
+            final_motives.append(motive)
+            if type(motive) is OverlapMotive:
+                # Look for redundant motives
+                for motive_to_compare in final_motives[:-1]:
+                    if (
+                        type(motive_to_compare) is OverlapMotive
+                    ):  # With EquivalenceMotive, equality check suffices
+                        if (
+                            motive.blocking_columns
+                            == motive_to_compare.blocking_columns
+                        ):
+                            if motive.word_level == motive_to_compare.word_level:
+                                # Replace Blocker with the one with bigger overlap
+                                if motive.overlap < motive_to_compare.overlap:
+                                    final_motives.remove(motive)
+                                    final_motives.append(motive_to_compare)
+                                elif motive.overlap > motive.overlap:
+                                    final_motives.remove(motive_to_compare)
+                                    final_motives.append(motive)
+                            elif motive.overlap == motive_to_compare.overlap:
+                                # Replace Blocker with the one with stricter word/element-level condition
+                                if (
+                                    motive.word_level
+                                    and not motive_to_compare.word_level
+                                ):
+                                    final_motives.remove(motive)
+                                    final_motives.append(motive_to_compare)
+                                elif (
+                                    not motive.word_level
+                                    and motive_to_compare.word_level
+                                ):
+                                    final_motives.remove(motive_to_compare)
+                                    final_motives.append(motive)
+
+    return final_motives
