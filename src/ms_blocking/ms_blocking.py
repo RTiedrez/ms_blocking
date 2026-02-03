@@ -657,9 +657,6 @@ def add_blocks_to_dataset(
                 }
                 output_data["_score"] = output_data.index.map(score_matcher)
 
-    # if "_block" not in output_data.columns:  # Empty coords
-    #    output_data["_block"] = -1
-
     output_data = output_data.reset_index(drop=True)
     output_data["_block"] = output_data["_block"].astype(int)
 
