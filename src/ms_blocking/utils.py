@@ -12,12 +12,14 @@ from typing import List, Set, Iterable, Dict, Collection, Any
 
 
 class EquivalenceMotive:
-    def __init__(self, blocking_column):
+    def __init__(self, blocking_column: str):
         if not isinstance(blocking_column, str):
             raise TypeError("blocking_column for Motive must be a string")
         self.blocking_column = blocking_column
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
+        if not isinstance(other, EquivalenceMotive | OverlapMotive):
+            raise TypeError("Can only compare Motives")
         return self.blocking_column == other.blocking_column
 
     def __str__(self):
@@ -28,7 +30,9 @@ class EquivalenceMotive:
 
 
 class OverlapMotive:
-    def __init__(self, blocking_column, overlap=1, word_level=False):
+    def __init__(
+        self, blocking_column: str, overlap: int = 1, word_level: bool = False
+    ):
         if not isinstance(blocking_column, str):
             raise TypeError("blocking_column for Motive must be a string")
         if not isinstance(overlap, int):
@@ -39,7 +43,9 @@ class OverlapMotive:
         self.overlap = overlap
         self.word_level = word_level
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
+        if not isinstance(other, EquivalenceMotive | OverlapMotive):
+            raise TypeError("Can only compare Motives")
         return (
             self.blocking_column == other.blocking_column
             and self.overlap == other.overlap
@@ -535,7 +541,7 @@ def solve_motives(motives: List[Motive]) -> List[Motive]:
 
     Examples
     --------
-    >>> solve_motives([OverlapMotive(['websites'], 1), OverlapMotive(['websites'], 2), OverlapMotive(['websites'], 2, word_level=False)])
+    >>> solve_motives([OverlapMotive('websites', 1), OverlapMotive('websites', 2), OverlapMotive('websites', 2, word_level=False)])
     [OverlapMotive(['websites'], 2, word_level=False)]
     """
     if not motives:
