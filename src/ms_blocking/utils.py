@@ -567,25 +567,40 @@ def solve_motives(motives: List[Motive]) -> List[Motive]:
 
         # Find biggest overlap among the non-word_level ones
         if not_word_level_motives_for_column:
-            max_overlap_not_word_level_for_column = max(not_word_level_motives_for_column, key=lambda m: m.overlap)
-            max_overlap_not_word_level_for_column_overlap = max_overlap_not_word_level_for_column.overlap
+            max_overlap_not_word_level_for_column = max(
+                not_word_level_motives_for_column, key=lambda m: m.overlap
+            )
+            max_overlap_not_word_level_for_column_overlap = (
+                max_overlap_not_word_level_for_column.overlap
+            )
         else:
             max_overlap_not_word_level_for_column = []
-            max_overlap_not_word_level_for_column_overlap = 0 # Will never be used, left for linter
+            max_overlap_not_word_level_for_column_overlap = (
+                0  # Will never be used, left for linter
+            )
 
         # Now find biggest overlap among the word_level ones
         if word_level_motives_for_column:
-            max_overlap_word_level_for_column = max(word_level_motives_for_column, key=lambda m: m.overlap)
-            max_overlap_word_level_for_column_overlap = max_overlap_word_level_for_column.overlap
+            max_overlap_word_level_for_column = max(
+                word_level_motives_for_column, key=lambda m: m.overlap
+            )
+            max_overlap_word_level_for_column_overlap = (
+                max_overlap_word_level_for_column.overlap
+            )
             if not_word_level_motives_for_column:
                 # If there is already an OverlapMotive on same column with equal or greater overlap but not word_level, discard it
-                if max_overlap_word_level_for_column_overlap <= max_overlap_not_word_level_for_column_overlap:
+                if (
+                    max_overlap_word_level_for_column_overlap
+                    <= max_overlap_not_word_level_for_column_overlap
+                ):
                     max_overlap_word_level_for_column = []
         else:
             max_overlap_word_level_for_column = []
 
         if max_overlap_not_word_level_for_column:
-            max_overlap_not_word_level_for_column = [max_overlap_not_word_level_for_column]
+            max_overlap_not_word_level_for_column = [
+                max_overlap_not_word_level_for_column
+            ]
         if max_overlap_word_level_for_column:
             max_overlap_word_level_for_column = [max_overlap_word_level_for_column]
         final_motives += (
