@@ -92,7 +92,7 @@ class AttributeEquivalenceBlocker(BlockerNode):  # Leaf
     """To regroup rows based on equality across columns."""
 
     def __init__(
-        self, blocking_columns, normalize_strings=True, must_not_be_different=None
+        self, blocking_columns, must_not_be_different=None, normalize_strings=True
     ):
         super().__init__()
 
@@ -121,7 +121,7 @@ class AttributeEquivalenceBlocker(BlockerNode):  # Leaf
         self.normalize = normalize_strings  # if True, will casefold+remove punctation+strip spaces for all strings before comparing them
 
     def __repr__(self):
-        return f"AttributeEquivalenceBlocker({self.blocking_columns}, {self.must_not_be_different})"
+        return f"AttributeEquivalenceBlocker({self.blocking_columns}{', ' + str(self.must_not_be_different) if self.must_not_be_different else ''}{', NON-NORMALIZED' if not self.normalize else ''})"
 
     def __eq__(self, other):
         if type(other) is AttributeEquivalenceBlocker:
@@ -216,7 +216,7 @@ class OverlapBlocker(BlockerNode):  # Leaf
         self.normalize = normalize_strings  # if True, will casefold+remove punctation+strip spaces for all strings before comparing them
 
     def __repr__(self):
-        return f"OverlapBlocker({self.blocking_columns}, {self.overlap})"
+        return f"OverlapBlocker({self.blocking_columns}, {self.overlap}{', WORD-LEVEL' if self.word_level else ''}{', NON-NORMALIZED' if not self.normalize else ''})"
 
     def __eq__(self, other):
         if type(other) is OverlapBlocker:
@@ -340,7 +340,16 @@ class MixedBlocker(BlockerNode):  # Leaf; For ANDs and RAM
         self.normalize = normalize_strings  # if True, will casefold+remove punctation+strip spaces for all strings before comparing them
 
     def __repr__(self):
-        return f"MixedBlocker({self.equivalence_columns}, {self.overlap_columns}, {self.overlap})"
+        return str(
+            AndNode(
+                AttributeEquivalenceBlocker(
+                    self.equivalence_columns, self.must_not_be_different, self.normalize
+                ),
+                OverlapBlocker(
+                    self.overlap_columns, self.overlap, self.word_level, self.normalize
+                ),
+            )
+        )
 
     def __eq__(self, other):
         if type(other) is AttributeEquivalenceBlocker:
