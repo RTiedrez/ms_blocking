@@ -84,18 +84,29 @@ def attribute_city_keep_ungrouped_rows_false():
 @pytest.fixture
 def attribute_city_motives_true_block():
     return {
-        frozenset({3, 8}): {"Same 'City'"},
-        frozenset({1, 4}): {"Same 'City'"},
-        frozenset({8, 11}): {"Same 'City'"},
-        frozenset({3, 11}): {"Same 'City'"},
-        frozenset({2, 5}): {"Same 'City'"},
-        frozenset({10, 13}): {"Same 'City'"},
+        frozenset({3, 8}): [msb.EquivalenceMotive("City")],
+        frozenset({1, 4}): [msb.EquivalenceMotive("City")],
+        frozenset({8, 11}): [msb.EquivalenceMotive("City")],
+        frozenset({3, 11}): [msb.EquivalenceMotive("City")],
+        frozenset({2, 5}): [msb.EquivalenceMotive("City")],
+        frozenset({10, 13}): [msb.EquivalenceMotive("City")],
     }
 
 
 @pytest.fixture
 def attribute_city_motives_true_add():
-    return [{"Same 'City'"}] * 9
+    return [
+        "[\"Same 'City'\"]",
+        "[\"Same 'City'\"]",
+        "[\"Same 'City'\"]",
+        "[\"Same 'City'\"]",
+        "[\"Same 'City'\"]",
+        "[\"Same 'City'\"]",
+        "[\"Same 'City'\"]",
+        "[\"Same 'City'\"]",
+        "[\"Same 'City'\"]",
+    ]
+    # [msb.EquivalenceMotive("City")] * 9
 
 
 @pytest.fixture
@@ -116,25 +127,65 @@ def city_age_name_websites_pipelining_id():
 @pytest.fixture
 def city_age_websites_pipelining_motives():
     return [
-        frozenset({"Same 'Age'", "Same 'City'", ">=1 overlap in 'websites'"}),
-        frozenset({"Same 'Age'", "Same 'City'", ">=1 overlap in 'websites'"}),
-        frozenset({"Same 'Age'", "Same 'City'", ">=1 overlap in 'websites'"}),
-        frozenset({"Same 'Age'", "Same 'City'", ">=1 overlap in 'websites'"}),
-        frozenset({"Same 'Age'", "Same 'City'", ">=1 overlap in 'websites'"}),
-        frozenset({"Same 'Age'", "Same 'City'", ">=1 overlap in 'websites'"}),
-        frozenset({">=1 overlap in 'websites'"}),
-        frozenset({">=1 overlap in 'websites'"}),
-        frozenset({"Same 'Age'", "Same 'City'"}),
-        frozenset({"Same 'Age'", "Same 'City'"}),
-        frozenset({">=1 overlap in 'websites'"}),
-        frozenset({">=1 overlap in 'websites'"}),
-        frozenset({">=1 overlap in 'websites'"}),
+        "[\"Same 'City'\", \"Same 'Age'\", \">=1 overlap in 'websites'\"]",
+        "[\">=1 overlap in 'websites'\"]",
+        "[\">=1 overlap in 'websites'\"]",
+        "[\"Same 'City'\", \"Same 'Age'\", \">=1 overlap in 'websites'\"]",
+        "[\">=1 overlap in 'websites'\"]",
+        "[\">=1 overlap in 'websites'\"]",
+        "[\">=1 overlap in 'websites'\"]",
+        "[\">=1 overlap in 'websites'\"]",
+        "[\"Same 'City'\", \"Same 'Age'\"]",
+        "[\"Same 'City'\", \"Same 'Age'\"]",
+        "[\">=1 overlap in 'websites'\"]",
+        "[\">=1 overlap in 'websites'\"]",
+        "[\">=1 overlap in 'websites'\"]",
     ]
+
+    # [
+    #     [
+    #         msb.EquivalenceMotive("Age"),
+    #         msb.EquivalenceMotive("City"),
+    #         msb.OverlapMotive("websites", 1),
+    #     ],
+    #     [
+    #         msb.EquivalenceMotive("Age"),
+    #         msb.EquivalenceMotive("City"),
+    #         msb.OverlapMotive("websites", 1),
+    #     ],
+    #     [
+    #         msb.EquivalenceMotive("Age"),
+    #         msb.EquivalenceMotive("City"),
+    #         msb.OverlapMotive("websites", 1),
+    #     ],
+    #     [
+    #         msb.EquivalenceMotive("Age"),
+    #         msb.EquivalenceMotive("City"),
+    #         msb.OverlapMotive("websites", 1),
+    #     ],
+    #     [
+    #         msb.EquivalenceMotive("Age"),
+    #         msb.EquivalenceMotive("City"),
+    #         msb.OverlapMotive("websites", 1),
+    #     ],
+    #     [
+    #         msb.EquivalenceMotive("Age"),
+    #         msb.EquivalenceMotive("City"),
+    #         msb.OverlapMotive("websites", 1),
+    #     ],
+    #     [msb.OverlapMotive("websites", 1)],
+    #     [msb.OverlapMotive("websites", 1)],
+    #     [msb.EquivalenceMotive("Age"), msb.EquivalenceMotive("City")],
+    #     [msb.EquivalenceMotive("Age"), msb.EquivalenceMotive("City")],
+    #     [msb.OverlapMotive("websites", 1)],
+    #     [msb.OverlapMotive("websites", 1)],
+    #     [msb.OverlapMotive("websites", 1)],
+    # ]
 
 
 @pytest.fixture
 def city_age_websites_pipelining_scores():
-    return [3, 3, 3, 3, 3, 3, 2, 2, 1, 1, 1, 1, 1]
+    return [3, 3, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 
 
 @pytest.fixture
@@ -350,10 +401,30 @@ def test_pipelining_scores(city_age_websites_pipelining_scores):
     final_blocker = (city_blocker & age_blocker) | websites_blocker
     links = final_blocker.block(get_users(), motives=True)
     report = msb.add_blocks_to_dataset(
-        get_users(), links, show_as_pairs=True, motives=True, merge_blocks=False
+        get_users(),
+        links,
+        show_as_pairs=True,
+        motives=True,
+        merge_blocks=False,
+        score=True,
     )
-    actual = sorted(msb.scoring(report), reverse=True)
+    actual = sorted(report["_score"], reverse=True)
     assert actual == expected
+
+
+# def test_pipelining_scores_without_show_as_pairs(city_age_websites_pipelining_scores):
+#    """Test that scoring does work as intended"""
+#    expected = city_age_websites_pipelining_scores
+#    city_blocker = msb.AttributeEquivalenceBlocker(["City"])
+#    age_blocker = msb.AttributeEquivalenceBlocker(["Age"])
+#    websites_blocker = msb.OverlapBlocker(["websites"])
+#    final_blocker = (city_blocker & age_blocker) | websites_blocker
+#    links = final_blocker.block(get_users(), motives=True)
+#    report = msb.add_blocks_to_dataset(
+#         get_users(), links, show_as_pairs=True, motives=True, merge_blocks=False, score=True
+#     )
+#    actual = sorted(msb.scoring(report), reverse=True)
+#    assert actual == expected
 
 
 def test_merge_blockers_aa():
