@@ -12,38 +12,45 @@ from typing import List, Set, Iterable, Dict, Collection, Any
 
 
 class EquivalenceMotive:
-    def __init__(self, blocking_columns):
-        self.blocking_columns = blocking_columns
+    def __init__(self, blocking_column):
+        if not isinstance(blocking_column, str):
+            raise TypeError("blocking_column for Motive must be a string")
+        self.blocking_column = blocking_column
 
     def __eq__(self, other):
-        return self.blocking_columns == other.blocking_columns
+        return self.blocking_column == other.blocking_column
+
+    def __str__(self):
+        return f"Same '{self.blocking_column}'"
 
     def __repr__(self):
-        return ", ".join(
-            [f"Same '{column_name}'" for column_name in self.blocking_columns]
-        )
+        return f"EquivalenceMotive(['{self.blocking_column}'])"
 
 
 class OverlapMotive:
-    def __init__(self, blocking_columns, overlap=1, word_level=False):
-        self.blocking_columns = blocking_columns
+    def __init__(self, blocking_column, overlap=1, word_level=False):
+        if not isinstance(blocking_column, str):
+            raise TypeError("blocking_column for Motive must be a string")
+        if not isinstance(overlap, int):
+            raise TypeError("overlap must be an int")
+        if not isinstance(word_level, bool):
+            raise TypeError("word_level must be a boolean")
+        self.blocking_column = blocking_column
         self.overlap = overlap
         self.word_level = word_level
 
     def __eq__(self, other):
         return (
-            self.blocking_columns == other.blocking_columns
+            self.blocking_column == other.blocking_column
             and self.overlap == other.overlap
             and self.word_level == other.word_level
         )
 
+    def __str__(self):
+        return f">={self.overlap}{' word-level' if self.word_level else ''} overlap in '{self.blocking_column}'"
+
     def __repr__(self):
-        return ", ".join(
-            [
-                f">={self.overlap}{' word_level' if self.word_level else ''} overlap in '{column_name}'"
-                for column_name in self.blocking_columns
-            ]
-        )
+        return f"OverlapMotive(['{self.blocking_column}'], {self.overlap}{', word_level=True' if self.word_level else ''})"
 
 
 Columns = List[str]
@@ -276,7 +283,7 @@ def merge_blocks_or(coords_1: Coords, coords_2: Coords) -> Coords:
     if type(coords_1) is type(coords_2) is dict:  # We have motives
         return {
             pair: (
-                (coords_1[pair] + coords_2[pair])
+                coords_1[pair] + coords_2[pair]
                 if (pair in coords_1 and pair in coords_2)
                 else coords_1[pair]
                 if (pair in coords_1)
@@ -287,6 +294,7 @@ def merge_blocks_or(coords_1: Coords, coords_2: Coords) -> Coords:
         }
     else:
         return coords_1.union(coords_2)
+    # TODO: check for merging one with motive and one w/o
 
 
 def merge_blocks_and(coords_1: Coords, coords_2: Coords) -> Coords:
@@ -314,7 +322,7 @@ def merge_blocks_and(coords_1: Coords, coords_2: Coords) -> Coords:
     """
     if type(coords_1) is type(coords_2) is dict:  # We have motives
         return {
-            pair: (coords_1[pair] + coords_2[pair])
+            pair: coords_1[pair] + coords_2[pair]
             for y in (coords_1, coords_2)
             for pair in y.keys()
             if (pair in coords_1 and pair in coords_2)
@@ -374,40 +382,6 @@ def parse_list(s: str | List, word_level: bool = False) -> List[str]:
         return [w for s in cleaned_items for w in s.split() if len(w) > 0]
     else:
         return [s for s in cleaned_items if len(s) > 0]
-
-
-def scoring(data: pd.DataFrame, motives_column: str = "_motive") -> pd.Series:
-    """Add a score to a blocked DataFrame based on the number of motives
-
-    Parameters
-    ----------
-    data : DataFrame
-      DataFrame with motives
-
-    motives_column : str
-      Name of the column containing the motives
-
-    Returns
-    -------
-    Series[int]
-      A column of scores
-    """
-
-    # Check that we do have motives
-    if motives_column not in data.columns:
-        if motives_column == "_motive":
-            raise ValueError("No motives in DataFrame")
-        else:
-            raise ValueError(
-                f'Specified motives column "{motives_column}" does not exist'
-            )
-
-    if "score" in data.columns:
-        print("Renaming 'score' column to 'score_old'")
-        data = data.rename(columns={"score": "score_old"})
-
-    scores = data[motives_column].apply(len)
-    return scores
 
 
 def must_not_be_different_apply(  # WIP
@@ -558,51 +532,69 @@ def solve_motives(motives: List[Motive]) -> List[Motive]:
     Returns
     -------
     List[Motive]
-      Pairs obtained by blocking
+      A list of Motives whose length should be smaller or equal to the original list of motives
 
     Examples
     --------
     >>> solve_motives([OverlapMotive(['websites'], 1), OverlapMotive(['websites'], 2), OverlapMotive(['websites'], 2, word_level=False)])
-    OverlapMotive(['websites'], 2, word_level=False)
+    [OverlapMotive(['websites'], 2, word_level=False)]
     """
     if not motives:
         raise ValueError("Motives must not be empty")
 
-    final_motives = [motives[0]]
-    for motive in motives[1:]:
-        if motive not in final_motives:
-            final_motives.append(motive)
-            if type(motive) is OverlapMotive:
-                # Look for redundant motives
-                for motive_to_compare in final_motives[:-1]:
-                    if (
-                        type(motive_to_compare) is OverlapMotive
-                    ):  # With EquivalenceMotive, equality check suffices
-                        if (
-                            motive.blocking_columns
-                            == motive_to_compare.blocking_columns
-                        ):
-                            if motive.word_level == motive_to_compare.word_level:
-                                # Replace Blocker with the one with bigger overlap
-                                if motive.overlap < motive_to_compare.overlap:
-                                    final_motives.remove(motive)
-                                    final_motives.append(motive_to_compare)
-                                elif motive.overlap > motive.overlap:
-                                    final_motives.remove(motive_to_compare)
-                                    final_motives.append(motive)
-                            elif motive.overlap == motive_to_compare.overlap:
-                                # Replace Blocker with the one with stricter word/element-level condition
-                                if (
-                                    motive.word_level
-                                    and not motive_to_compare.word_level
-                                ):
-                                    final_motives.remove(motive)
-                                    final_motives.append(motive_to_compare)
-                                elif (
-                                    not motive.word_level
-                                    and motive_to_compare.word_level
-                                ):
-                                    final_motives.remove(motive_to_compare)
-                                    final_motives.append(motive)
+    # split_motives = []
+    # for motive in motives:
+    #    split_motives += split_motive(motive)
 
-    return final_motives
+    final_motives = [
+        motive for motive in motives if type(motive) is EquivalenceMotive
+    ]  # With EquivalenceMotive, equality check suffices
+    overlap_motives = [motive for motive in motives if type(motive) is OverlapMotive]
+    overlap_columns = [motive.blocking_column for motive in overlap_motives]
+
+    for column in overlap_columns:
+        overlap_motives_for_column = [
+            motive for motive in overlap_motives if motive.blocking_column == column
+        ]
+
+        # Select Blocker with stricter word/element-level condition
+        word_level_motives_for_column = [
+            motive for motive in overlap_motives_for_column if motive.word_level
+        ]
+        not_word_level_motives_for_column = [
+            motive for motive in overlap_motives_for_column if not motive.word_level
+        ]
+
+        # Find biggest overlap among the non-word_level ones
+        if not_word_level_motives_for_column:
+            max_overlap_not_word_level_for_column = max(not_word_level_motives_for_column, key=lambda m: m.overlap)
+            max_overlap_not_word_level_for_column_overlap = max_overlap_not_word_level_for_column.overlap
+        else:
+            max_overlap_not_word_level_for_column = []
+            max_overlap_not_word_level_for_column_overlap = 0 # Will never be used, left for linter
+
+        # Now find biggest overlap among the word_level ones
+        if word_level_motives_for_column:
+            max_overlap_word_level_for_column = max(word_level_motives_for_column, key=lambda m: m.overlap)
+            max_overlap_word_level_for_column_overlap = max_overlap_word_level_for_column.overlap
+            if not_word_level_motives_for_column:
+                # If there is already an OverlapMotive on same column with equal or greater overlap but not word_level, discard it
+                if max_overlap_word_level_for_column_overlap <= max_overlap_not_word_level_for_column_overlap:
+                    max_overlap_word_level_for_column = []
+        else:
+            max_overlap_word_level_for_column = []
+
+        if max_overlap_not_word_level_for_column:
+            max_overlap_not_word_level_for_column = [max_overlap_not_word_level_for_column]
+        if max_overlap_word_level_for_column:
+            max_overlap_word_level_for_column = [max_overlap_word_level_for_column]
+        final_motives += (
+            max_overlap_word_level_for_column + max_overlap_not_word_level_for_column
+        )
+
+    # Remove duplicates
+    final_motives_no_duplicates = []
+    for motive in final_motives:
+        if motive not in final_motives_no_duplicates:
+            final_motives_no_duplicates.append(motive)
+    return final_motives_no_duplicates

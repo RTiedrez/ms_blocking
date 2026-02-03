@@ -186,7 +186,7 @@ class AttributeEquivalenceBlocker(BlockerNode):  # Leaf
         }
 
         if motives:
-            explanations = [EquivalenceMotive(self.blocking_columns)]
+            explanations = [EquivalenceMotive(col) for col in self.blocking_columns]
             return add_motives_to_coords(coords, explanations)
         else:
             return set(coords)  # set is unnnecessary
@@ -276,7 +276,8 @@ class OverlapBlocker(BlockerNode):  # Leaf
 
         if motives:
             explanations = [
-                OverlapMotive(self.blocking_columns, self.overlap, self.word_level)
+                OverlapMotive(col, self.overlap, self.word_level)
+                for col in self.blocking_columns
             ]
             return add_motives_to_coords(coords, explanations)
         else:
@@ -425,8 +426,10 @@ class MixedBlocker(BlockerNode):  # Leaf; For ANDs and RAM
 
         if motives:
             explanations = [
-                EquivalenceMotive(self.equivalence_columns),
-                OverlapMotive(self.overlap_columns, self.overlap, self.word_level),
+                EquivalenceMotive(col) for col in self.equivalence_columns
+            ] + [
+                OverlapMotive(col, self.overlap, self.word_level)
+                for col in self.overlap_columns
             ]
 
             return add_motives_to_coords(coords, explanations)
@@ -443,6 +446,7 @@ def add_blocks_to_dataset(
     motives: bool = False,
     show_as_pairs: bool = False,
     output_columns: Columns = None,
+    score: bool = False,
 ) -> pd.DataFrame:
     """Returns the intersection of an array of links
 
@@ -466,6 +470,8 @@ def add_blocks_to_dataset(
            Whether to show the output as pairs or rows rather than simply reordering the initial DataFrame
        output_columns : list
            Columns to show. Useful in combination with show_as_pairs as column names are altered
+       score : bool
+           Whether to show a score (computed from the number of motives)
 
     Returns
     -------
@@ -494,11 +500,14 @@ def add_blocks_to_dataset(
 
     if motives:
         if type(coords) is not dict:
-            raise TypeError("Cannot specify motives=True without passing motives")
+            raise TypeError("Cannot specify 'motives=True' without passing motives")
 
     # Ensure the index is a unique identifier
     if not data.index.is_unique:
         raise ValueError("DataFrame index must be unique to be used as an identifier.")
+
+    if score and not motives:
+        raise ValueError("Cannot specify 'score=True' without passing motives")
 
     if "_motive" in data.columns:
         if motives:
@@ -506,11 +515,18 @@ def add_blocks_to_dataset(
                 "Please rename existing '_motive' column OR do not pass 'motives=True'"
             )
 
+    if "score" in data.columns:
+        if score:
+            raise ValueError(
+                "Please rename existing '_score' column OR do not pass 'score=True'"
+            )
+
     if "_block" in data.columns:
         raise ValueError("Please rename existing '_block' column")
 
     if output_columns is None:
         output_columns = data.columns
+
     data = data[output_columns].copy()
 
     if len(coords) == 0 and not keep_ungrouped_rows:  # Empty graph
@@ -521,6 +537,13 @@ def add_blocks_to_dataset(
             output_data = pd.DataFrame(columns=columns)
         else:
             output_data = pd.DataFrame(columns=data.columns)
+
+        if motives:
+            output_data["_motive"] = ""
+        if score:
+            output_data["_score"] = 0
+        output_data["_block"] = -1
+
     else:
         output_data = data
         # Map coords to connected component labels
@@ -561,7 +584,12 @@ def add_blocks_to_dataset(
                 )
                 current_row.index = current_index
                 if motives:
-                    current_row["_motive"] = str(solve_motives(coords[pair]))
+                    motives_solved = solve_motives(coords[pair])
+                    current_row["_motive"] = str(list(map(str, motives_solved)))
+                    if score:
+                        current_row["_score"] = len(
+                            motives_solved
+                        )  # Score is simply the number of non-redundant motives
                 output_data = pd.concat([output_data, current_row])
 
         # Assign blocks to rows based on their original index
@@ -612,17 +640,24 @@ def add_blocks_to_dataset(
         if not show_as_pairs and motives:
             id_list = flatten(coords.keys())
             motive_matcher = {
-                row_id: frozenset(
-                    str(solve_motives(coords[pair]))
-                    for pair in coords.keys()
-                    if row_id in pair
-                )
+                row_id: str(list(map(str, solve_motives(coords[pair]))))
+                for pair in coords.keys()
                 for row_id in id_list
+                if row_id in pair
             }
             output_data["_motive"] = output_data.index.map(motive_matcher)
+            if score:
+                output_data["_score"] = 0
+                score_matcher = {  # Horribly repetitive
+                    row_id: len(solve_motives(coords[pair]))
+                    for pair in coords.keys()
+                    for row_id in id_list
+                    if row_id in pair
+                }
+                output_data["_score"] = output_data.index.map(score_matcher)
 
-    if "_block" not in output_data.columns:  # Empty coords
-        output_data["_block"] = -1
+    # if "_block" not in output_data.columns:  # Empty coords
+    #    output_data["_block"] = -1
 
     output_data = output_data.reset_index(drop=True)
     output_data["_block"] = output_data["_block"].astype(int)
@@ -802,3 +837,6 @@ def merge_blockers(
         )
     else:
         return AndNode(left, right)
+
+
+# TODO: deport logic in a way that enables .progress_apply
