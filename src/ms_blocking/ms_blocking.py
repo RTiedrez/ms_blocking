@@ -585,7 +585,7 @@ def add_blocks_to_dataset(
                 current_row.index = current_index
                 if motives:
                     motives_solved = solve_motives(coords[pair])
-                    current_row["_motive"] = str(list(map(str, motives_solved)))
+                    current_row["_motive"] = [list(map(str, motives_solved))]
                     if score:
                         current_row["_score"] = len(
                             motives_solved
@@ -640,11 +640,12 @@ def add_blocks_to_dataset(
         if not show_as_pairs and motives:
             id_list = flatten(coords.keys())
             motive_matcher = {
-                row_id: str(list(map(str, solve_motives(coords[pair]))))
+                row_id: list(map(str, solve_motives(coords[pair])))
                 for pair in coords.keys()
                 for row_id in id_list
                 if row_id in pair
             }
+            # noinspection PyTypeChecker
             output_data["_motive"] = output_data.index.map(motive_matcher)
             if score:
                 output_data["_score"] = 0
