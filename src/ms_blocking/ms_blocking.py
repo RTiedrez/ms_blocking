@@ -154,11 +154,17 @@ class AttributeEquivalenceBlocker(BlockerNode):  # Leaf
             .copy()
         )
 
-        for col in self.blocking_columns:
-            if self.normalize:
-                temp_data[col] = temp_data[col].apply(normalize)
-            temp_data = temp_data[temp_data[col].duplicated(keep=False)]
+        # Normalize strings if required
+        if self.normalize:
+            temp_data[self.blocking_columns] = temp_data[self.blocking_columns].apply(
+                lambda col: col.apply(normalize)
+            )
+        # Non-duplicated values cannot belong to any block; We discard them
+        temp_data = temp_data[
+            temp_data.duplicated(keep=False, subset=self.blocking_columns)
+        ]
 
+        # No need to run anything else if we already ran out of candidates
         if len(temp_data) == 0:  # No pairs
             if motives:
                 return dict()
@@ -252,15 +258,24 @@ class OverlapBlocker(BlockerNode):  # Leaf
 
         temp_data = data[self.blocking_columns].dropna().copy()
 
-        for col in self.blocking_columns:
-            temp_data[col] = temp_data[col].apply(
-                parse_list, word_level=self.word_level
+        # Ensure we check for overlap between lists of strings
+        temp_data[self.blocking_columns] = temp_data[self.blocking_columns].apply(
+            lambda col: col.apply(parse_list, word_level=self.word_level)
+        )
+        # Split elements of said lists to compare them one by one
+        temp_data = temp_data.explode(self.blocking_columns)
+        # Normalize strings if required
+        if self.normalize:
+            temp_data[self.blocking_columns] = temp_data[self.blocking_columns].apply(
+                lambda col: col.apply(normalize)
             )
-            temp_data = temp_data.explode(col)
-            if self.normalize:
-                temp_data[col] = temp_data[col].apply(normalize)
-            temp_data = temp_data[temp_data[col].duplicated(keep=False)]
 
+        # Non-duplicated values cannot belong to any block; We discard them
+        temp_data = temp_data[
+            temp_data.duplicated(keep=False, subset=self.blocking_columns)
+        ]
+
+        # No need to run anything else if we already ran out of candidates
         if len(temp_data) == 0:  # No pairs fulfill any overlap
             if motives:
                 return dict()
@@ -387,20 +402,21 @@ class MixedBlocker(BlockerNode):  # Leaf; For ANDs and RAM
 
         temp_data = data[total_columns].dropna().copy()
 
-        for col in total_columns:
-            if col in self.equivalence_columns:
-                temp_data[col] = temp_data[col].apply(normalize)
-            elif col in self.overlap_columns:
-                temp_data[col] = temp_data[col].apply(
-                    lambda x: [
-                        normalize(item) for item in parse_list(x, self.word_level)
-                    ]
-                    if self.normalize
-                    else parse_list(x, self.word_level)
-                )
-                temp_data = temp_data.explode(col)
-            temp_data = temp_data[temp_data[col].duplicated(keep=False)]
+        # Ensure we check for overlap between lists of strings
+        temp_data[self.overlap_columns] = temp_data[self.overlap_columns].apply(
+            lambda col: col.apply(parse_list, word_level=self.word_level)
+        )
+        # Split elements of said lists to compare them one by one
+        temp_data = temp_data.explode(self.overlap_columns)
+        # Normalize strings if required
+        if self.normalize:
+            temp_data[total_columns] = temp_data[total_columns].apply(
+                lambda col: col.apply(normalize)
+            )
+        # Non-duplicated values cannot belong to any block; We discard them
+        temp_data = temp_data[temp_data.duplicated(keep=False, subset=total_columns)]
 
+        # No need to run anything else if we already ran out of candidates
         if len(temp_data) == 0:  # No pairs fulfill any overlap
             if motives:
                 return dict()
