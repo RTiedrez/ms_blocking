@@ -236,7 +236,7 @@ def flatten(list_of_iterables_: Collection[Iterable]) -> List[Any] | None:
     try:
         return [element for iterable_ in list_of_iterables_ for element in iterable_]
     except TypeError:
-        print("Argument must a list-like object")
+        raise TypeError("Argument must a list-like object")
 
 
 def merge_blocks_or(coords_1: Coords, coords_2: Coords) -> Coords:
@@ -348,8 +348,12 @@ def parse_list(s: str | List, word_level: bool = False) -> List[str]:
         else:
             return s
 
-    if pd.isna(s):
-        return []
+    try:
+        if pd.isna(s):
+            return []
+    except ValueError:  # We have an array
+        if pd.isna(s).all():
+            return []
 
     s = str(s).strip()
 
