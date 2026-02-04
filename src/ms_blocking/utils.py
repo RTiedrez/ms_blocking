@@ -201,11 +201,11 @@ def normalize(text: Any) -> Any:
         if pd.isna(text).all():
             return text
         else:
-            return [s for s in text if not pd.isna(s)]
+            text = [s for s in text if not pd.isna(s)]
 
     if isinstance(text, str):
         return normalize_function(text)
-    elif isinstance(text, (list, tuple, set)):
+    elif isinstance(text, list|tuple|set):
         return [normalize_function(item) for item in text]
     else:
         return normalize_function(str(text))
