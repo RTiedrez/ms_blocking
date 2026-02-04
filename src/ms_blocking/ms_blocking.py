@@ -162,7 +162,7 @@ class AttributeEquivalenceBlocker(BlockerNode):  # Leaf
         ]
 
         # No need to run anything else if we already ran out of candidates
-        if len(temp_data) == 0:  # No pairs
+        if temp_data.empty:  # No pairs
             if motives:
                 return dict()
             else:
@@ -175,7 +175,7 @@ class AttributeEquivalenceBlocker(BlockerNode):  # Leaf
                 must_not_be_different_columns=self.must_not_be_different,
             )
 
-            if len(temp_data) == 0:  # No pairs
+            if temp_data.empty:  # No pairs
                 if motives:
                     return dict()
                 else:
@@ -273,7 +273,7 @@ class OverlapBlocker(BlockerNode):  # Leaf
         ]
 
         # No need to run anything else if we already ran out of candidates
-        if len(temp_data) == 0:  # No pairs fulfill any overlap
+        if temp_data.empty:  # No pairs fulfill any overlap
             if motives:
                 return dict()
             else:
@@ -397,7 +397,9 @@ class MixedBlocker(BlockerNode):  # Leaf; For ANDs and RAM
 
         print("Processing", self)
 
-        total_columns = self.equivalence_columns + self.overlap_columns + self.must_not_be_different
+        total_columns = (
+            self.equivalence_columns + self.overlap_columns + self.must_not_be_different
+        )
 
         temp_data = data[total_columns].dropna().copy()
 
@@ -416,7 +418,7 @@ class MixedBlocker(BlockerNode):  # Leaf; For ANDs and RAM
         temp_data = temp_data[temp_data.duplicated(keep=False, subset=total_columns)]
 
         # No need to run anything else if we already ran out of candidates
-        if len(temp_data) == 0:  # No pairs fulfill any overlap
+        if temp_data.empty:  # No pairs fulfill any overlap
             if motives:
                 return dict()
             else:
