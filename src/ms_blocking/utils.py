@@ -366,7 +366,7 @@ def parse_list(s: str | List, word_level: bool = False) -> List[str]:
 
     if type(s) is list:  # If we already have a list
         if (
-            len(s) == 1 and str(s[0]).startswith("[") and str(s[0]).startswith("]")
+            len(s) == 1 and str(s[0]).startswith("[") and str(s[0]).endswith("]")
         ):  # In case we have a stringified list INSIDE a normal list
             s = s[0]
         else:
@@ -380,7 +380,7 @@ def parse_list(s: str | List, word_level: bool = False) -> List[str]:
     if not s:
         return []
 
-    if s.startswith("[") and s.startswith("]"):  # Stringified list?
+    if s.startswith("[") and s.endswith("]"):  # Stringified list?
         try:
             parts = ast.literal_eval(s)
         except ValueError:  # doesn't seem to be a stringified list
