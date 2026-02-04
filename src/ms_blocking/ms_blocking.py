@@ -1,5 +1,7 @@
 from ms_blocking.utils import *  # noqa: F403
 
+import networkx as nx
+
 
 class BlockerNode:
     """Abstract class from which derive all classes in the module"""
@@ -46,7 +48,7 @@ class AndNode(BlockerNode):
     def __repr__(self):
         return f"AndNode{{{self.left}, {self.right}}}"
 
-    def block(self, df, motives=False):
+    def block(self, df: pd.DataFrame, motives: bool = False) -> Coords:
         # In order not to perform redundant computations, we first filter out the rows that were not considered by the first blocker before running the second blocker
         coords_left = self.left.block(df, motives=motives)
 
@@ -76,8 +78,7 @@ class OrNode(BlockerNode):
     def __repr__(self):
         return f"OrNode{{{self.left}, {self.right}}}"
 
-
-    def block(self, df, motives=False):
+    def block(self, df: pd.DataFrame, motives: bool = False) -> Coords:
         # Note: for performance, it would be wise to remove rows that are already paired with all other rows, though this case should be pretty rare in real situations
         coords_left = self.left.block(df, motives=motives)
 
@@ -91,7 +92,10 @@ class AttributeEquivalenceBlocker(BlockerNode):  # Leaf
     """To regroup rows based on equality across columns."""
 
     def __init__(
-        self, blocking_columns, normalize_strings=True, must_not_be_different=None
+        self,
+        blocking_columns: str | Collection[str],
+        must_not_be_different: str | Collection[str] = None,
+        normalize_strings: bool = True,
     ):
         super().__init__()
 
@@ -120,7 +124,7 @@ class AttributeEquivalenceBlocker(BlockerNode):  # Leaf
         self.normalize = normalize_strings  # if True, will casefold+remove punctation+strip spaces for all strings before comparing them
 
     def __repr__(self):
-        return f"AttributeEquivalenceBlocker({self.blocking_columns}, {self.must_not_be_different})"
+        return f"AttributeEquivalenceBlocker({self.blocking_columns}{', ' + str(self.must_not_be_different) if self.must_not_be_different else ''}{', NON-NORMALIZED' if not self.normalize else ''})"
 
     def __eq__(self, other):
         if type(other) is AttributeEquivalenceBlocker:
@@ -139,21 +143,28 @@ class AttributeEquivalenceBlocker(BlockerNode):  # Leaf
         else:
             return False
 
-    def block(self, data, motives=False):
+    def block(self, data: pd.DataFrame, motives: bool = False) -> Coords:
         """Regroup rows based on equality of one or more columns"""
 
         print("Processing", self)
 
-        temp_data = data.copy()
-
-        for col in self.blocking_columns:
-            if self.normalize:
-                temp_data[col] = temp_data[col].apply(normalize)
-        temp_data = temp_data.dropna(subset=self.blocking_columns)
-        temp_data = remove_rows_if_value_appears_only_once(
-            temp_data, self.blocking_columns
+        temp_data = (
+            data[self.blocking_columns + self.must_not_be_different]
+            .dropna(subset=self.blocking_columns)
+            .copy()
         )
 
+        # Normalize strings if required
+        if self.normalize:
+            temp_data[self.blocking_columns] = temp_data[self.blocking_columns].apply(
+                lambda col: col.apply(normalize)
+            )
+        # Non-duplicated values cannot belong to any block; We discard them
+        temp_data = temp_data[
+            temp_data.duplicated(keep=False, subset=self.blocking_columns)
+        ]
+
+        # No need to run anything else if we already ran out of candidates
         if len(temp_data) == 0:  # No pairs
             if motives:
                 return dict()
@@ -185,9 +196,7 @@ class AttributeEquivalenceBlocker(BlockerNode):  # Leaf
         }
 
         if motives:
-            explanations = {
-                f"Same '{column_name}'" for column_name in self.blocking_columns
-            }
+            explanations = [EquivalenceMotive(col) for col in self.blocking_columns]
             return add_motives_to_coords(coords, explanations)
         else:
             return set(coords)  # set is unnnecessary
@@ -197,7 +206,11 @@ class OverlapBlocker(BlockerNode):  # Leaf
     """To regroup rows based on overlap of one or more columns."""
 
     def __init__(
-        self, blocking_columns, overlap=1, word_level=False, normalize_strings=True
+        self,
+        blocking_columns: str | Collection[str],
+        overlap: int = 1,
+        word_level: bool = False,
+        normalize_strings: bool = True,
     ):
         super().__init__()
 
@@ -217,7 +230,7 @@ class OverlapBlocker(BlockerNode):  # Leaf
         self.normalize = normalize_strings  # if True, will casefold+remove punctation+strip spaces for all strings before comparing them
 
     def __repr__(self):
-        return f"OverlapBlocker({self.blocking_columns}, {self.overlap})"
+        return f"OverlapBlocker({self.blocking_columns}, {self.overlap}{', WORD-LEVEL' if self.word_level else ''}{', NON-NORMALIZED' if not self.normalize else ''})"
 
     def __eq__(self, other):
         if type(other) is OverlapBlocker:
@@ -238,29 +251,31 @@ class OverlapBlocker(BlockerNode):  # Leaf
         else:
             return False
 
-    def block(self, data, motives=False):
+    def block(self, data: pd.DataFrame, motives: bool = False) -> Coords:
         """Regroup rows based on overlap of one or more columns"""
 
         print("Processing", self)
 
-        temp_data = data.copy()
+        temp_data = data[self.blocking_columns].dropna().copy()
 
-        temp_data = temp_data[self.blocking_columns].copy()
-
-        for col in self.blocking_columns:
-            temp_data[col] = temp_data[col].apply(
-                parse_list, word_level=self.word_level
-            )
-            temp_data = temp_data.explode(col)
-            if self.normalize:
-                temp_data[col] = temp_data[col].apply(normalize)
-        temp_data = temp_data.dropna(
-            subset=self.blocking_columns
-        )  # Remove empty objects
-        temp_data = remove_rows_if_value_appears_only_once(
-            temp_data, self.blocking_columns
+        # Ensure we check for overlap between lists of strings
+        temp_data[self.blocking_columns] = temp_data[self.blocking_columns].apply(
+            lambda col: col.apply(parse_list, word_level=self.word_level)
         )
+        # Split elements of said lists to compare them one by one
+        temp_data = temp_data.explode(self.blocking_columns)
+        # Normalize strings if required
+        if self.normalize:
+            temp_data[self.blocking_columns] = temp_data[self.blocking_columns].apply(
+                lambda col: col.apply(normalize)
+            )
 
+        # Non-duplicated values cannot belong to any block; We discard them
+        temp_data = temp_data[
+            temp_data.duplicated(keep=False, subset=self.blocking_columns)
+        ]
+
+        # No need to run anything else if we already ran out of candidates
         if len(temp_data) == 0:  # No pairs fulfill any overlap
             if motives:
                 return dict()
@@ -268,7 +283,7 @@ class OverlapBlocker(BlockerNode):  # Leaf
                 return set()
 
         # Use the DataFrame index for grouping and forming pairs
-        # Using frozenset since they are ahshable and thus can be used as dictionary keys
+        # Using frozenset since they are hashable and thus can be used as dictionary keys
         groups = temp_data.groupby(self.blocking_columns).apply(
             lambda x: frozenset(x.index), include_groups=False
         )
@@ -276,10 +291,10 @@ class OverlapBlocker(BlockerNode):  # Leaf
         coords = block_overlap(groups=groups, overlap=self.overlap)
 
         if motives:
-            explanations = {
-                f">={self.overlap}{' word_level' if self.word_level else ''} overlap in '{column_name}'"
-                for column_name in self.blocking_columns
-            }
+            explanations = [
+                OverlapMotive(col, self.overlap, self.word_level)
+                for col in self.blocking_columns
+            ]
             return add_motives_to_coords(coords, explanations)
         else:
             return set(coords)
@@ -287,17 +302,17 @@ class OverlapBlocker(BlockerNode):  # Leaf
 
 class MixedBlocker(BlockerNode):  # Leaf; For ANDs and RAM
     """Represent the intersection of an AttributeEquivalenceBlocker and an OverlapBlocker.
-    Designed for performance and RAM efficiency.
+    Used for performance and RAM efficiency.
     """
 
     def __init__(
         self,
-        equivalence_columns,
-        overlap_columns,
-        must_not_be_different=None,
-        overlap=1,
-        word_level=False,
-        normalize_strings=True,
+        equivalence_columns: str | Collection[str],
+        overlap_columns: str | Collection[str],
+        must_not_be_different: str | Collection[str] = None,
+        overlap: int = 1,
+        word_level: bool = False,
+        normalize_strings: bool = True,
     ):
         super().__init__()
 
@@ -341,7 +356,16 @@ class MixedBlocker(BlockerNode):  # Leaf; For ANDs and RAM
         self.normalize = normalize_strings  # if True, will casefold+remove punctation+strip spaces for all strings before comparing them
 
     def __repr__(self):
-        return f"MixedBlocker({self.equivalence_columns}, {self.overlap_columns}, {self.overlap})"
+        return str(
+            AndNode(
+                AttributeEquivalenceBlocker(
+                    self.equivalence_columns, self.must_not_be_different, self.normalize
+                ),
+                OverlapBlocker(
+                    self.overlap_columns, self.overlap, self.word_level, self.normalize
+                ),
+            )
+        )
 
     def __eq__(self, other):
         if type(other) is AttributeEquivalenceBlocker:
@@ -369,31 +393,30 @@ class MixedBlocker(BlockerNode):  # Leaf; For ANDs and RAM
         else:
             return False
 
-    def block(self, data, motives=False):
+    def block(self, data: pd.DataFrame, motives: bool = False) -> Coords:
         """Regroup rows based on overlap of one or more columns"""
 
         print("Processing", self)
 
         total_columns = self.equivalence_columns + self.overlap_columns
 
-        temp_data = data[total_columns].copy()
+        temp_data = data[total_columns].dropna().copy()
 
-        for col in total_columns:
-            if col in self.equivalence_columns:
-                temp_data[col] = temp_data[col].apply(normalize)
-            elif col in self.overlap_columns:
-                temp_data[col] = temp_data[col].apply(
-                    lambda x: [
-                        normalize(item) for item in parse_list(x, self.word_level)
-                    ]
-                    if self.normalize
-                    else parse_list(x, self.word_level)
-                )
-                temp_data = temp_data.explode(col)
+        # Ensure we check for overlap between lists of strings
+        temp_data[self.overlap_columns] = temp_data[self.overlap_columns].apply(
+            lambda col: col.apply(parse_list, word_level=self.word_level)
+        )
+        # Split elements of said lists to compare them one by one
+        temp_data = temp_data.explode(self.overlap_columns)
+        # Normalize strings if required
+        if self.normalize:
+            temp_data[total_columns] = temp_data[total_columns].apply(
+                lambda col: col.apply(normalize)
+            )
+        # Non-duplicated values cannot belong to any block; We discard them
+        temp_data = temp_data[temp_data.duplicated(keep=False, subset=total_columns)]
 
-        temp_data = temp_data.dropna(subset=total_columns)  # Remove empty objects
-        temp_data = remove_rows_if_value_appears_only_once(temp_data, total_columns)
-
+        # No need to run anything else if we already ran out of candidates
         if len(temp_data) == 0:  # No pairs fulfill any overlap
             if motives:
                 return dict()
@@ -426,15 +449,259 @@ class MixedBlocker(BlockerNode):  # Leaf; For ANDs and RAM
         coords = coords_equivalence.intersection(coords_overlap)
 
         if motives:
-            explanations = {
-                f"Same '{column_name}'" for column_name in self.equivalence_columns
-            } | {
-                f">={self.overlap}{' word_level' if self.word_level else ''} overlap in '{column_name}'"
-                for column_name in self.overlap_columns
-            }
+            explanations = [
+                EquivalenceMotive(col) for col in self.equivalence_columns
+            ] + [
+                OverlapMotive(col, self.overlap, self.word_level)
+                for col in self.overlap_columns
+            ]
+
             return add_motives_to_coords(coords, explanations)
         else:
             return set(coords)
+
+
+def add_blocks_to_dataset(
+    data: pd.DataFrame,
+    coords: Coords,
+    sort: bool = True,
+    keep_ungrouped_rows: bool = False,
+    merge_blocks: bool = True,
+    motives: bool = False,
+    show_as_pairs: bool = False,
+    output_columns: Columns = None,
+    score: bool = False,
+) -> pd.DataFrame:
+    """Returns the intersection of an array of links
+
+    Takes two lists of paired elements, with or without motives, returns their intersection
+
+    Parameters
+    ----------
+       data : DataFrame
+           DataFrame for blocking
+       coords : Array
+           Blocked coordinates
+       sort : bool
+           Whether to sort the result by block, thereby regrouping rows of the same block
+       keep_ungrouped_rows : bool
+           Whether to display rows that do not belong to any block
+       merge_blocks : bool
+           Whether to merge transitively merge blocks
+       motives : bool
+           Whether to display the reason behind each block
+       show_as_pairs : bool
+           Whether to show the output as pairs or rows rather than simply reordering the initial DataFrame
+       output_columns : list
+           Columns to show. Useful in combination with show_as_pairs as column names are altered
+       score : bool
+           Whether to show a score (computed from the number of motives)
+
+    Returns
+    -------
+    DataFrame
+      Blocked DataFrame
+
+    Examples
+    --------
+    >>> add_blocks_to_dataset(data=pd.DataFrame(
+       [
+           [0, 'first', 4],
+           [1, 'second', 6],
+           [2, 'first', 2],
+           [3, 'third', 5]
+       ],
+       columns=['id', 'rank', 'score']),
+       coords=np.array([{0, 2}]),
+       show_as_pairs=True,
+       output_columns=['id', 'rank'])
+        id_l rank_l  id_r rank_r  block
+       0     0  first     2  first      0
+    """
+
+    if show_as_pairs and keep_ungrouped_rows:
+        raise ValueError("Cannot both return pairs and keep ungrouped rows")
+
+    if motives:
+        if type(coords) is not dict:
+            raise TypeError("Cannot specify 'motives=True' without passing motives")
+
+    # Ensure the index is a unique identifier
+    if not data.index.is_unique:
+        raise ValueError("DataFrame index must be unique to be used as an identifier.")
+
+    if score and not motives:
+        raise ValueError("Cannot specify 'score=True' without passing motives")
+
+    if "_motive" in data.columns:
+        if motives:
+            raise ValueError(
+                "Please rename existing '_motive' column OR do not pass 'motives=True'"
+            )
+
+    if "score" in data.columns:
+        if score:
+            raise ValueError(
+                "Please rename existing '_score' column OR do not pass 'score=True'"
+            )
+
+    if "_block" in data.columns:
+        raise ValueError("Please rename existing '_block' column")
+
+    if output_columns is None:
+        output_columns = data.columns
+
+    data = data[output_columns].copy()
+
+    if len(coords) == 0 and not keep_ungrouped_rows:  # Empty graph
+        if show_as_pairs:
+            columns = [col + "_l" for col in data.columns] + [
+                col + "_r" for col in data.columns
+            ]
+            output_data = pd.DataFrame(columns=columns)
+        else:
+            output_data = pd.DataFrame(columns=data.columns)
+
+        if motives:
+            output_data["_motive"] = ""
+        if score:
+            output_data["_score"] = 0
+        output_data["_block"] = -1
+
+    else:
+        output_data = data
+        # Map coords to connected component labels
+        if merge_blocks:  # We solve the connected components problem
+            cc_labels = solve_connected_components_from_coords(coords)
+            # Match original index to new block ID
+            matcher = {
+                idx: label
+                for idx, label in enumerate(cc_labels)
+                if label != -1 and idx in data.index
+            }
+        else:  # We solve the cliques problem
+            g = nx.Graph()
+            # noinspection PyTypeChecker
+            g.add_edges_from(coords)
+            complete_subgraphs = list(nx.find_cliques(g))
+            complete_subgraphs = sorted(complete_subgraphs)
+            # matcher = {row_id:([i for i in range(len(complete_subgraphs)) if row_id in complete_subgraphs[i]]) for row_id in set(flatten(complete_subgraphs))}
+            matcher = dict()
+            for i, clique in enumerate(complete_subgraphs):
+                for node_idx in clique:
+                    if node_idx in matcher.keys():
+                        matcher[node_idx].append(i)
+                    else:
+                        matcher[node_idx] = [i]
+
+        if show_as_pairs:
+            output_data = pd.DataFrame()
+            for pair in coords:
+                left_row = data.loc[[tuple(pair)[0]]].copy()
+                current_index = left_row.index
+                right_row = data.loc[[tuple(pair)[1]]].copy()
+                left_row.columns = [col + "_l" for col in left_row.columns]
+                right_row.columns = [col + "_r" for col in right_row.columns]
+                current_row = pd.concat(
+                    [left_row.reset_index(drop=True), right_row.reset_index(drop=True)],
+                    axis=1,
+                )
+                current_row.index = current_index
+                if motives:
+                    motives_solved = solve_motives(coords[pair])
+                    current_row["_motive"] = [list(map(str, motives_solved))]
+                    if score:
+                        current_row["_score"] = len(
+                            motives_solved
+                        )  # Score is simply the number of non-redundant motives
+                output_data = pd.concat([output_data, current_row])
+
+        # Assign blocks to rows based on their original index
+        output_data["_block"] = output_data.index.map(matcher)
+        if not merge_blocks:
+            output_data = output_data.explode("_block")
+
+        if keep_ungrouped_rows:
+            output_data["_block"] = output_data["_block"].fillna(-1)
+            matcher_ungrouped_rows = {}
+            block_temp = []
+            i = 0  # Track # of blocks processed
+            for b in output_data["_block"]:
+                if b == -1:
+                    block_temp.append(i)
+                    i += 1
+                elif b not in matcher_ungrouped_rows:
+                    matcher_ungrouped_rows[b] = i
+                    block_temp.append(i)
+                    i += 1
+                else:
+                    block_temp.append(matcher_ungrouped_rows[b])
+            output_data["_block"] = block_temp
+        else:
+            if not show_as_pairs:
+                output_data = output_data[
+                    output_data["_block"].duplicated(keep=False)
+                    & output_data["_block"].notna()
+                ]
+
+        output_data.loc[:, ["_block"]] = start_from_zero(output_data["_block"])
+
+        if sort:
+            # Sort by block, then by original index
+            sort_cols = ["_block"]
+            if output_data.index.name:
+                output_data = output_data.sort_values(
+                    sort_cols + [output_data.index.name]
+                )
+            else:
+                # If no named index, use the first column of the DataFrame
+                output_data = output_data.reset_index()
+                output_data = output_data.sort_values(
+                    sort_cols + [output_data.columns[0]]
+                )
+                output_data = output_data.set_index(output_data.columns[0])
+
+        if not show_as_pairs and motives:
+            id_list = flatten(coords.keys())
+            motive_matcher = {
+                row_id: list(map(str, solve_motives(coords[pair])))
+                for pair in coords.keys()
+                for row_id in id_list
+                if row_id in pair
+            }
+            # noinspection PyTypeChecker
+            output_data["_motive"] = output_data.index.map(motive_matcher)
+            if score:
+                output_data["_score"] = 0
+                score_matcher = {  # Horribly repetitive
+                    row_id: len(solve_motives(coords[pair]))
+                    for pair in coords.keys()
+                    for row_id in id_list
+                    if row_id in pair
+                }
+                output_data["_score"] = output_data.index.map(score_matcher)
+
+    output_data = output_data.reset_index(drop=True)
+    output_data["_block"] = output_data["_block"].astype(int)
+
+    return output_data
+
+
+def generate_blocking_report(
+    data: pd.DataFrame, coords: Coords, output_columns: Collection[str] = None
+) -> pd.DataFrame:
+    """
+    Shorthand for add_blocks_to_dataset with below arguments
+    """
+    return add_blocks_to_dataset(
+        data,
+        coords,
+        sort=True,
+        merge_blocks=False,
+        motives=True,
+        show_as_pairs=True,
+        output_columns=output_columns,
+    )
 
 
 def merge_blockers(
@@ -592,3 +859,6 @@ def merge_blockers(
         )
     else:
         return AndNode(left, right)
+
+
+# TODO: deport logic in a way that enables .progress_apply
