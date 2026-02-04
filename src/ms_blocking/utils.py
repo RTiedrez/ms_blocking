@@ -193,8 +193,15 @@ def normalize(text: Any) -> Any:
     >>> normalize('I like_Music!!! :)')
     'i like music'
     """
-    if pd.isna(text):
-        return text
+
+    try:
+        if pd.isna(text):
+            return text
+    except ValueError:  # We have an array
+        if pd.isna(text).all():
+            return text
+        else:
+            return [s for s in text if not pd.isna(s)]
 
     if isinstance(text, str):
         return normalize_function(text)
