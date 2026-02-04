@@ -361,7 +361,7 @@ def parse_list(s: str | List, word_level: bool = False) -> List[str]:
             parts = ast.literal_eval(s)
         except ValueError:  # doesn't seem to be a stringified list
             parts = s.split("', '")
-        except SyntaxError:  # In case we have a string surroudned by brackets
+        except SyntaxError:  # In case we have a string surrouded by brackets
             parts = s.split()
     else:
         parts = s.split()

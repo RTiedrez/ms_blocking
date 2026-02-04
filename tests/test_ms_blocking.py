@@ -3,6 +3,7 @@ import pytest
 
 import ms_blocking.ms_blocking as msb
 from ms_blocking.datasets import get_users
+from ms_blocking.ms_blocking import AndNode
 
 
 @pytest.fixture
@@ -42,11 +43,6 @@ def overlap_websites_merge_blocks():
 @pytest.fixture
 def attribute_city_age_links():
     return {frozenset({1, 4}), frozenset({2, 5}), frozenset({8, 11})}
-
-
-@pytest.fixture
-def attribute_name_normalize_strings_links():
-    return set()
 
 
 @pytest.fixture
@@ -215,9 +211,9 @@ def test_double_attribute_equivalence_blocking(attribute_city_age_links):
     )
 
 
-def test_normalize_strings_false(attribute_name_normalize_strings_links):
+def test_normalize_strings_false():
     """Test that normalize_strings=False does work as intended"""
-    expected = attribute_name_normalize_strings_links
+    expected = set()
     normalized_name_blocker = msb.AttributeEquivalenceBlocker(
         ["Name"], normalize_strings=False
     )
@@ -330,18 +326,6 @@ def test_pipelining(city_age_name_websites_pipelining_id):
     assert actual == expected
 
 
-def test_generate_blocking_report(attribute_city_show_as_pairs_true_id):
-    """Test that generate_blocking_report does work as intended"""
-    expected = attribute_city_show_as_pairs_true_id
-    city_blocker = msb.AttributeEquivalenceBlocker(["City"])
-    links = city_blocker.block(get_users(), motives=True)
-    blocked_df = msb.add_blocks_to_dataset(get_users(), links, show_as_pairs=True)
-    id_ls = blocked_df["id_l"].to_list()
-    id_rs = blocked_df["id_r"].to_list()
-    actual = set(zip(id_ls, id_rs))
-    assert actual == expected
-
-
 def test_pipelining_motives(city_age_websites_pipelining_motives):
     """Test that pipelining does work as intended regarding motives"""
     expected = city_age_websites_pipelining_motives
@@ -414,6 +398,10 @@ def test_merge_blockers_oo():
     websites_blocker_1 = msb.OverlapBlocker(["websites"])
     websites_blocker_2 = msb.OverlapBlocker(["websites"])
     actual = websites_blocker_1 & websites_blocker_2
+    assert actual == expected
+    expected = msb.OverlapBlocker(["Name", "websites"])
+    name_overlap_blocker = msb.OverlapBlocker(["Name"])
+    actual = name_overlap_blocker & websites_blocker_1
     assert actual == expected
 
 
@@ -513,6 +501,17 @@ def test_must_not_be_different(city_age_not_different):
     )
     actual = city_blocker_not_different_age.block(get_users())
     assert actual == expected
+    mixed_age_blocker_not_different_name = msb.MixedBlocker(
+        ["Age"], ["websites"], must_not_be_different=["Name"], normalize_strings=False
+    )
+    actual = mixed_age_blocker_not_different_name.block(get_users())
+    assert actual == set()
+    mixed_age_blocker_not_different_name_normalized = msb.MixedBlocker(
+        ["Age"], ["websites"], must_not_be_different=["Name"]
+    )
+    links = mixed_age_blocker_not_different_name_normalized.block(get_users())
+    actual = msb.add_blocks_to_dataset(get_users(), links)["Name"].to_list()
+    assert actual == []
 
 
 def test_no_links_a():
@@ -581,3 +580,189 @@ def test_no_links_add_blocks_to_dataframe():
     links_motives = id_blocker.block(get_users(), motives=True)
     actual_motives = msb.add_blocks_to_dataset(get_users(), links_motives, motives=True)
     assert (actual_motives == expected_motives).all().all()
+
+
+def test_generic_blockernode_methods():
+    expected = msb.AttributeEquivalenceBlocker(["City"])
+    city_blocker = msb.AttributeEquivalenceBlocker(["City"])
+    actual = city_blocker | city_blocker
+    assert actual == expected
+    name_blocker = msb.AttributeEquivalenceBlocker(["Name"])
+    actual = AndNode(city_blocker, name_blocker)
+    assert actual != 42
+    name_blocker = msb.AttributeEquivalenceBlocker(["Name"])
+    expected = f"OrNode{{{msb.AttributeEquivalenceBlocker(['City'])}, {msb.AttributeEquivalenceBlocker(['Name'])}}}"
+    actual = str(city_blocker | name_blocker)
+    assert actual == expected
+    mixed_city_websites_blocker = msb.MixedBlocker(["City"], ["websites"])
+    assert mixed_city_websites_blocker != 42
+
+
+def test_errors_with_constructors():
+    with pytest.raises(ValueError):
+        msb.AttributeEquivalenceBlocker(["City"], ["City"])
+    with pytest.raises(ValueError):
+        msb.AttributeEquivalenceBlocker(["City"], ["Age", "Name"])
+    with pytest.raises(ValueError):
+        msb.OverlapBlocker(["websites"], -1)
+    with pytest.raises(ValueError):
+        msb.MixedBlocker(["City"], [], ["City"], overlap=-1)
+    with pytest.raises(ValueError):
+        msb.MixedBlocker(["websites"], [], ["Age", "Name"], overlap=-1)
+    with pytest.raises(ValueError):
+        msb.MixedBlocker([], ["websites"], overlap=-1)
+    with pytest.raises(ValueError):
+        msb.MixedBlocker(["City"], [], ["Age", "Name"])
+    with pytest.raises(ValueError):
+        msb.MixedBlocker(["City"], [], ["City"])
+    with pytest.raises(TypeError):
+        # noinspection PyTypeChecker
+        msb.EquivalenceMotive(42)
+    with pytest.raises(TypeError):
+        # noinspection PyTypeChecker
+        msb.OverlapMotive(42)
+    with pytest.raises(TypeError):
+        # noinspection PyTypeChecker
+        msb.OverlapMotive("City", "42")
+    with pytest.raises(TypeError):
+        # noinspection PyTypeChecker
+        msb.OverlapMotive("City", 1, 42)
+
+
+def test_comparing_motives():
+    city_motive = msb.EquivalenceMotive("City")
+    websites_motive = msb.OverlapMotive("websites")
+    with pytest.raises(TypeError):
+        assert city_motive == 42
+    with pytest.raises(TypeError):
+        assert websites_motive == 42
+    assert city_motive != websites_motive
+    assert websites_motive != city_motive
+
+
+def test_repr_motives():
+    city_motive = msb.EquivalenceMotive("City")
+    websites_motive = msb.OverlapMotive("websites")
+    assert city_motive.__repr__() == "EquivalenceMotive('City')"
+    assert websites_motive.__repr__() == "OverlapMotive('websites', 1)"
+
+
+def test_edge_normalize():
+    expected = ["abricot", "banane", "couscous", 42]
+    actual = msb.normalize(["__Abricot", "Banane", "(Couscous)", 42])
+    assert actual == expected
+    assert msb.normalize([None, None]) == [None, None]
+
+def test_edge_parse_list():
+    assert msb.parse_list([["a", "b", "c"]]) == ["a", "b", "c"]
+    assert msb.parse_list(['["a", "b", "c"]']) == ["a", "b", "c"]
+    assert msb.parse_list('[-42-]') == [42]
+
+
+def test_errors_with_functions():
+    city_blocker = msb.AttributeEquivalenceBlocker(["City"])
+    links = city_blocker.block(get_users())
+    links_motives = city_blocker.block(get_users(), motives=True)
+    data_broken_index = get_users()
+    data_broken_index.index = [1] * len(data_broken_index)
+    data__motive = get_users().rename({"Age": "_motive"}, axis=1)
+    data__score = get_users().rename({"Age": "_score"}, axis=1)
+    data__block = get_users().rename({"Age": "_block"}, axis=1)
+
+    with pytest.raises(TypeError):
+        msb.add_blocks_to_dataset(get_users(), links, motives=True)
+    with pytest.raises(ValueError):
+        msb.add_blocks_to_dataset(
+            get_users(), links, show_as_pairs=True, keep_ungrouped_rows=True
+        )
+    with pytest.raises(ValueError):
+        msb.add_blocks_to_dataset(data_broken_index, links)
+    with pytest.raises(TypeError):
+        msb.add_blocks_to_dataset(get_users(), links, score=True)
+    with pytest.raises(ValueError):
+        msb.add_blocks_to_dataset(data__motive, links_motives, motives=True)
+    with pytest.raises(ValueError):
+        msb.add_blocks_to_dataset(data__score, links_motives, motives=True, score=True)
+    with pytest.raises(ValueError):
+        msb.add_blocks_to_dataset(data__block, links)
+    with pytest.raises(ValueError):
+        msb.add_blocks_to_dataset(data__block, links)
+    with pytest.raises(TypeError):
+        # noinspection PyTypeChecker
+        msb.flatten(42)
+
+
+def test_passing_strings_to_constructors(city_age_name_websites_pipelining_id):
+    """Test that passing strings to constructors instead of lists does work as intended"""
+    expected = city_age_name_websites_pipelining_id
+    city_blocker = msb.AttributeEquivalenceBlocker("City", "Age")
+    age_blocker = msb.AttributeEquivalenceBlocker("Age")
+    name_blocker = msb.AttributeEquivalenceBlocker("Name")
+    websites_blocker = msb.OverlapBlocker("websites")
+    final_blocker = (city_blocker & age_blocker) | (name_blocker & websites_blocker)
+    links = final_blocker.block(get_users(), motives=True)
+    actual = msb.add_blocks_to_dataset(get_users(), links)["id"].to_list()
+    assert actual == expected
+    some_mixed_blocker = msb.MixedBlocker("City", "websites", "id")
+    actual = some_mixed_blocker.block(get_users(), motives=True)
+    assert actual == dict()
+
+
+def test_return_empty():
+    nope_blocker_ae = msb.AttributeEquivalenceBlocker(
+        "Name", "Age", normalize_strings=False
+    )
+    actual = nope_blocker_ae.block(get_users())
+    assert actual == set()
+    actual = nope_blocker_ae.block(get_users(), motives=True)
+    assert actual == dict()
+
+    nope_blocker_overlap = msb.OverlapBlocker("id")
+    actual = nope_blocker_overlap.block(get_users())
+    assert actual == set()
+    actual = nope_blocker_overlap.block(get_users(), motives=True)
+    assert actual == dict()
+
+    actual = (nope_blocker_ae & nope_blocker_overlap).block(get_users(), motives=True)
+    assert actual == dict()
+
+
+def test_add_empty_coords_to_dataframe():
+    expected = pd.DataFrame(
+        columns=["id", "Name", "City", "Age", "websites", "_motive", "_score", "_block"]
+    )
+    actual = msb.add_blocks_to_dataset(get_users(), dict(), motives=True, score=True)
+    assert (actual == expected).all().all()
+
+
+def test_generate_blocking_report(city_age_websites_pipelining_motives):
+    expected_block = [0, 0, 0, 1, 1, 1, 1, 1, 2, 3, 4, 4, 4]
+    expected_motives = city_age_websites_pipelining_motives
+    expected_score = [3, 1, 1, 3, 1, 1, 1, 1, 2, 2, 1, 1, 1]
+    city_blocker = msb.AttributeEquivalenceBlocker(["City"])
+    age_blocker = msb.AttributeEquivalenceBlocker(["Age"])
+    websites_blocker = msb.OverlapBlocker(["websites"])
+    final_blocker = (city_blocker & age_blocker) | websites_blocker
+    links = final_blocker.block(get_users(), motives=True)
+    actual = msb.generate_blocking_report(get_users(), links)
+    actual_block = actual["_block"].to_list()
+    actual_motive = [set(motive) for motive in actual["_motive"].to_list()]
+    actual_score = actual["_score"].to_list()
+    assert expected_block == actual_block
+    assert expected_motives == actual_motive
+    assert expected_score == actual_score
+
+
+def test_empty_after_must_not_be_different():
+    mixed_age_blocker_not_different_age = msb.AttributeEquivalenceBlocker(
+        ["Age"], ["Name"]
+    )
+    actual = mixed_age_blocker_not_different_age.block(get_users())
+    actual_motives = mixed_age_blocker_not_different_age.block(
+        get_users(), motives=True
+    )
+    assert actual == {frozenset({8, 11}), frozenset({2, 5})}
+    assert actual_motives == {
+        frozenset({8, 11}): [msb.EquivalenceMotive("Age")],
+        frozenset({2, 5}): [msb.EquivalenceMotive("Age")],
+    }
