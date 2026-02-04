@@ -1,6 +1,6 @@
-from ms_blocking.utils import *  # noqa: F403
-
 import networkx as nx
+
+from ms_blocking.utils import *  # noqa: F403
 
 
 class BlockerNode:
@@ -153,9 +153,9 @@ class AttributeEquivalenceBlocker(BlockerNode):  # Leaf
 
         # Normalize strings if required
         if self.normalize:
-            temp_data[self.blocking_columns] = temp_data[self.blocking_columns].apply(
-                lambda col: col.apply(normalize)
-            )
+            temp_data[self.blocking_columns + self.must_not_be_different] = temp_data[
+                self.blocking_columns + self.must_not_be_different
+            ].apply(lambda col: col.apply(normalize))
         # Non-duplicated values cannot belong to any block; We discard them
         temp_data = temp_data[
             temp_data.duplicated(keep=False, subset=self.blocking_columns)
@@ -168,21 +168,8 @@ class AttributeEquivalenceBlocker(BlockerNode):  # Leaf
             else:
                 return set()
 
-        if self.must_not_be_different:  # Perform a second row of blocking on a new attribute, but this time, NaNs validate the blocking condition
-            temp_data = must_not_be_different_apply(
-                temp_data,
-                blocking_columns=self.blocking_columns,
-                must_not_be_different_columns=self.must_not_be_different,
-            )
-
-            if temp_data.empty:  # No pairs
-                if motives:
-                    return dict()
-                else:
-                    return set()
-
         # Use the DataFrame index for grouping and forming pairs
-        # Using frozenset since they are ahshable and thus can be used as dictionary keys
+        # Using frozenset since they are hashable and thus can be used as dictionary keys
         groups = temp_data.groupby(
             self.blocking_columns + self.must_not_be_different
         ).apply(lambda x: frozenset(x.index), include_groups=False)
@@ -253,7 +240,9 @@ class OverlapBlocker(BlockerNode):  # Leaf
 
         print("Processing", self)
 
-        temp_data = data[self.blocking_columns].dropna().copy()
+        temp_data = (
+            data[self.blocking_columns].dropna(subset=self.blocking_columns).copy()
+        )
 
         # Ensure we check for overlap between lists of strings
         temp_data[self.blocking_columns] = temp_data[self.blocking_columns].apply(
@@ -266,8 +255,10 @@ class OverlapBlocker(BlockerNode):  # Leaf
             temp_data[self.blocking_columns] = temp_data[self.blocking_columns].apply(
                 lambda col: col.apply(normalize)
             )
-
         # Non-duplicated values cannot belong to any block; We discard them
+        temp_data = temp_data.dropna(
+            subset=self.blocking_columns
+        )  # Empty lists may have passed through the first dropna
         temp_data = temp_data[
             temp_data.duplicated(keep=False, subset=self.blocking_columns)
         ]
@@ -401,7 +392,11 @@ class MixedBlocker(BlockerNode):  # Leaf; For ANDs and RAM
             self.equivalence_columns + self.overlap_columns + self.must_not_be_different
         )
 
-        temp_data = data[total_columns].dropna().copy()
+        temp_data = (
+            data[total_columns]
+            .dropna(subset=(self.equivalence_columns + self.overlap_columns))
+            .copy()
+        )
 
         # Ensure we check for overlap between lists of strings
         temp_data[self.overlap_columns] = temp_data[self.overlap_columns].apply(
@@ -415,7 +410,14 @@ class MixedBlocker(BlockerNode):  # Leaf; For ANDs and RAM
                 lambda col: col.apply(normalize)
             )
         # Non-duplicated values cannot belong to any block; We discard them
-        temp_data = temp_data[temp_data.duplicated(keep=False, subset=total_columns)]
+        temp_data = temp_data.dropna(
+            subset=(self.equivalence_columns + self.overlap_columns)
+        )  # Empty lists may have passed through the first dropna
+        temp_data = temp_data[
+            temp_data.duplicated(
+                keep=False, subset=(self.equivalence_columns + self.overlap_columns)
+            )
+        ]
 
         # No need to run anything else if we already ran out of candidates
         if temp_data.empty:  # No pairs fulfill any overlap
@@ -424,17 +426,10 @@ class MixedBlocker(BlockerNode):  # Leaf; For ANDs and RAM
             else:
                 return set()
 
-        if self.must_not_be_different:  # Perform a second row of blocking on a new attribute, but this time, NaNs validate the blocking condition
-            temp_data = must_not_be_different_apply(
-                temp_data,
-                blocking_columns=total_columns,
-                must_not_be_different_columns=self.must_not_be_different,
-            )
-
-        # Using frozenset since they are ahshable and thus can be used as dictionary keys
-        groups_equivalence = temp_data.groupby(self.equivalence_columns).apply(
-            lambda x: frozenset(x.index), include_groups=False
-        )
+        # Using frozenset since they are hashable and thus can be used as dictionary keys
+        groups_equivalence = temp_data.groupby(
+            self.equivalence_columns + self.must_not_be_different
+        ).apply(lambda x: frozenset(x.index), include_groups=False)
         groups_overlap = temp_data.groupby(self.overlap_columns).apply(
             lambda x: frozenset(x.index), include_groups=False
         )
@@ -864,6 +859,3 @@ def merge_blockers(
         )
     else:
         return AndNode(left, right)
-
-
-# TODO: deport logic in a way that enables .progress_apply

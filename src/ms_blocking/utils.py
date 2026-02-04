@@ -1,14 +1,13 @@
-import numpy as np
 import ast
 import re
+from collections import Counter
+from itertools import combinations
+from typing import Any, Collection, Dict, Iterable, List, Set
+
+import numpy as np
+import pandas as pd
 from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import connected_components
-import pandas as pd
-import random
-from collections import Counter
-
-from itertools import combinations
-from typing import List, Set, Iterable, Dict, Collection, Any
 
 
 class EquivalenceMotive:
@@ -26,7 +25,7 @@ class EquivalenceMotive:
         return f"Same '{self.blocking_column}'"
 
     def __repr__(self):
-        return f"EquivalenceMotive(['{self.blocking_column}'])"
+        return f"EquivalenceMotive('{self.blocking_column}')"
 
 
 class OverlapMotive:
@@ -56,7 +55,7 @@ class OverlapMotive:
         return f">={self.overlap}{' word-level' if self.word_level else ''} overlap in '{self.blocking_column}'"
 
     def __repr__(self):
-        return f"OverlapMotive(['{self.blocking_column}'], {self.overlap}{', word_level=True' if self.word_level else ''})"
+        return f"OverlapMotive('{self.blocking_column}', {self.overlap}{', word_level=True' if self.word_level else ''})"
 
 
 Columns = List[str]
@@ -366,66 +365,6 @@ def parse_list(s: str | List, word_level: bool = False) -> List[str]:
         return [w for s in cleaned_items for w in s.split() if len(w) > 0]
     else:
         return [s for s in cleaned_items if len(s) > 0]
-
-
-def must_not_be_different_apply(  # WIP
-    temp_data: pd.DataFrame,
-    blocking_columns: List[str],
-    must_not_be_different_columns: List[str],
-):
-    """Re-block DataFrame on a second column, where we require non-difference rather than equality
-
-    Parameters
-    ----------
-    temp_data : DataFrame
-      Partially blocked DataFrame
-
-    blocking_columns : List[str]
-      Columns where we check for equality
-
-    must_not_be_different_columns : List[str]
-        Columns where we only check for non-difference
-
-    Returns
-    -------
-    DataFrame
-      Column of scores
-    """
-
-    series_block_id = temp_data.groupby(blocking_columns).ngroup()
-    temp_data = temp_data[series_block_id.duplicated(keep=False)]
-
-    reconstructed_data = pd.DataFrame(columns=temp_data.columns)
-    for block in series_block_id.unique():
-        # noinspection PyArgumentList
-        current_block = (
-            temp_data[series_block_id == block]
-            .sort_values(must_not_be_different_columns)
-            .copy()
-        )
-        if (
-            len(current_block[current_block[must_not_be_different_columns].notnull()])
-            == 0
-        ):  # All nulls
-            random_string = "".join(
-                random.choices("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", k=10)
-            )  # As long as the string is not already in the column...
-            # There must be a better way to do it...
-            current_block[must_not_be_different_columns] = (
-                current_block[must_not_be_different_columns]
-                .astype(str)
-                .fillna(random_string)
-            )
-        else:
-            current_block[must_not_be_different_columns] = (
-                current_block[must_not_be_different_columns].astype(str).ffill()
-            )
-        if len(reconstructed_data) == 0:
-            reconstructed_data = current_block
-        else:
-            reconstructed_data = pd.concat([reconstructed_data, current_block])
-
-    return reconstructed_data
 
 
 def block_overlap(groups: Iterable, overlap: int = 1) -> Coords:
