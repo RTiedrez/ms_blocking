@@ -148,7 +148,11 @@ class AttributeEquivalenceBlocker(BlockerNode):  # Leaf
 
         print("Processing", self)
 
-        temp_data = data.copy()
+        temp_data = (
+            data[self.blocking_columns + self.must_not_be_different]
+            .dropna(subset=self.blocking_columns)
+            .copy()
+        )
 
         for col in self.blocking_columns:
             if self.normalize:
@@ -246,7 +250,7 @@ class OverlapBlocker(BlockerNode):  # Leaf
 
         print("Processing", self)
 
-        temp_data = data[self.blocking_columns].copy()
+        temp_data = data[self.blocking_columns].dropna().copy()
 
         for col in self.blocking_columns:
             temp_data[col] = temp_data[col].apply(
@@ -256,9 +260,6 @@ class OverlapBlocker(BlockerNode):  # Leaf
             if self.normalize:
                 temp_data[col] = temp_data[col].apply(normalize)
             temp_data = temp_data[temp_data[col].duplicated(keep=False)]
-        temp_data = temp_data.dropna(
-            subset=self.blocking_columns
-        )  # Remove empty objects
 
         if len(temp_data) == 0:  # No pairs fulfill any overlap
             if motives:
@@ -384,7 +385,7 @@ class MixedBlocker(BlockerNode):  # Leaf; For ANDs and RAM
 
         total_columns = self.equivalence_columns + self.overlap_columns
 
-        temp_data = data[total_columns].copy()
+        temp_data = data[total_columns].dropna().copy()
 
         for col in total_columns:
             if col in self.equivalence_columns:
@@ -399,8 +400,6 @@ class MixedBlocker(BlockerNode):  # Leaf; For ANDs and RAM
                 )
                 temp_data = temp_data.explode(col)
             temp_data = temp_data[temp_data[col].duplicated(keep=False)]
-
-        temp_data = temp_data.dropna(subset=total_columns)  # Remove empty objects
 
         if len(temp_data) == 0:  # No pairs fulfill any overlap
             if motives:
