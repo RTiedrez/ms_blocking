@@ -70,36 +70,6 @@ _PUNCT_RE = re.compile(r'[!"#$%&()*+,-./:;<=>?@\[\\\]^_`{|}~]')
 _SPACE_RE = re.compile(r"\s+")
 
 
-def remove_rows_if_value_appears_only_once(
-    data: pd.DataFrame, cols: Columns
-) -> pd.DataFrame:
-    """Drop rows of a Pandas DataFrame where a certain column's values appears only once.
-
-    Ensures all elements of provided columns appear at least twice in their column
-
-    Parameters
-    ----------
-    data : DataFrame
-      DataFrame to preprocess
-
-    cols : List[str]
-      List of columns where rows that contain non-duplicated elements shall be discarded
-
-    Returns
-    -------
-    DataFrame
-      DataFrame with reduced number of rows
-
-    Examples
-    --------
-    >>> remove_rows_if_value_appears_only_once(data, ['name', 'city'])
-    """
-    for col in cols:
-        counts = data[col].map(data[col].value_counts())
-        data = data[counts >= 2]
-    return data
-
-
 def start_from_zero(figures: Collection[int]) -> List[int]:
     """Turns a list of integers into a same-length list that starts at 0, without gaps
 

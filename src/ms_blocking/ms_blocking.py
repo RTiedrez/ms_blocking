@@ -153,10 +153,7 @@ class AttributeEquivalenceBlocker(BlockerNode):  # Leaf
         for col in self.blocking_columns:
             if self.normalize:
                 temp_data[col] = temp_data[col].apply(normalize)
-        temp_data = temp_data.dropna(subset=self.blocking_columns)
-        temp_data = remove_rows_if_value_appears_only_once(
-            temp_data, self.blocking_columns
-        )
+            temp_data = temp_data[temp_data[col].duplicated(keep=False)]
 
         if len(temp_data) == 0:  # No pairs
             if motives:
@@ -249,9 +246,7 @@ class OverlapBlocker(BlockerNode):  # Leaf
 
         print("Processing", self)
 
-        temp_data = data.copy()
-
-        temp_data = temp_data[self.blocking_columns].copy()
+        temp_data = data[self.blocking_columns].copy()
 
         for col in self.blocking_columns:
             temp_data[col] = temp_data[col].apply(
@@ -260,12 +255,10 @@ class OverlapBlocker(BlockerNode):  # Leaf
             temp_data = temp_data.explode(col)
             if self.normalize:
                 temp_data[col] = temp_data[col].apply(normalize)
+            temp_data = temp_data[temp_data[col].duplicated(keep=False)]
         temp_data = temp_data.dropna(
             subset=self.blocking_columns
         )  # Remove empty objects
-        temp_data = remove_rows_if_value_appears_only_once(
-            temp_data, self.blocking_columns
-        )
 
         if len(temp_data) == 0:  # No pairs fulfill any overlap
             if motives:
@@ -274,7 +267,7 @@ class OverlapBlocker(BlockerNode):  # Leaf
                 return set()
 
         # Use the DataFrame index for grouping and forming pairs
-        # Using frozenset since they are ahshable and thus can be used as dictionary keys
+        # Using frozenset since they are hashable and thus can be used as dictionary keys
         groups = temp_data.groupby(self.blocking_columns).apply(
             lambda x: frozenset(x.index), include_groups=False
         )
@@ -405,9 +398,9 @@ class MixedBlocker(BlockerNode):  # Leaf; For ANDs and RAM
                     else parse_list(x, self.word_level)
                 )
                 temp_data = temp_data.explode(col)
+            temp_data = temp_data[temp_data[col].duplicated(keep=False)]
 
         temp_data = temp_data.dropna(subset=total_columns)  # Remove empty objects
-        temp_data = remove_rows_if_value_appears_only_once(temp_data, total_columns)
 
         if len(temp_data) == 0:  # No pairs fulfill any overlap
             if motives:
