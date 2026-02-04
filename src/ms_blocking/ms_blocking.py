@@ -29,9 +29,6 @@ class BlockerNode:
         else:
             return OrNode(self, other)
 
-    def __repr__(self):
-        return f"Node{{{self.left}, {self.right}}}"
-
     def __eq__(self, other):
         if not isinstance(other, BlockerNode):
             return False
@@ -531,7 +528,7 @@ def add_blocks_to_dataset(
         raise ValueError("DataFrame index must be unique to be used as an identifier.")
 
     if score and not motives:
-        raise ValueError("Cannot specify 'score=True' without passing motives")
+        raise TypeError("Cannot specify 'score=True' without passing motives")
 
     if "_motive" in data.columns:
         if motives:
@@ -539,7 +536,7 @@ def add_blocks_to_dataset(
                 "Please rename existing '_motive' column OR do not pass 'motives=True'"
             )
 
-    if "score" in data.columns:
+    if "_score" in data.columns:
         if score:
             raise ValueError(
                 "Please rename existing '_score' column OR do not pass 'score=True'"
