@@ -347,7 +347,9 @@ def parse_list(s: str | List, word_level: bool = False) -> List[str]:
       Stringified representation of a list e.g. "['string 1', 'string 2', ...]"
 
     word_level : bool
-      Whether to return a list of all words within s instead of a list of each comma-separated element
+      Whether to return a list of all words within s instead of a list of each comma-separated element;
+      Note that if passed a string that does not represent a list, this argument will be ignored and the function
+      will return a list of each word in the string
 
     Returns
     -------
@@ -363,7 +365,9 @@ def parse_list(s: str | List, word_level: bool = False) -> List[str]:
     """
 
     if type(s) is list:  # If we already have a list
-        if len(s) == 1 and s[0][0] == "[" and s[0][-1] == "]":
+        if (
+            len(s) == 1 and str(s[0]).startswith("[") and str(s[0]).startswith("]")
+        ):  # In case we have a stringified list INSIDE a normal list
             s = s[0]
         else:
             return s
@@ -376,10 +380,15 @@ def parse_list(s: str | List, word_level: bool = False) -> List[str]:
     if not s:
         return []
 
-    try:
-        parts = ast.literal_eval(s)
-    except ValueError:  # doesn't seem to be a stringified list
-        parts = s.split("', '")
+    if s.startswith("[") and s.startswith("]"):  # Stringified list?
+        try:
+            parts = ast.literal_eval(s)
+        except ValueError:  # doesn't seem to be a stringified list
+            parts = s.split("', '")
+        except SyntaxError:  # In case we have a string surroudned by brackets
+            parts = s.split()
+    else:
+        parts = s.split()
 
     cleaned_items = [str(part).strip().strip("''") for part in parts]
 

@@ -48,7 +48,7 @@ class AndNode(BlockerNode):
     def __repr__(self):
         return f"AndNode{{{self.left}, {self.right}}}"
 
-    def block(self, df: pd.DataFrame, motives: bool=False) -> Coords:
+    def block(self, df: pd.DataFrame, motives: bool = False) -> Coords:
         # In order not to perform redundant computations, we first filter out the rows that were not considered by the first blocker before running the second blocker
         coords_left = self.left.block(df, motives=motives)
 
@@ -78,7 +78,7 @@ class OrNode(BlockerNode):
     def __repr__(self):
         return f"OrNode{{{self.left}, {self.right}}}"
 
-    def block(self, df: pd.DataFrame, motives: bool=False) -> Coords:
+    def block(self, df: pd.DataFrame, motives: bool = False) -> Coords:
         # Note: for performance, it would be wise to remove rows that are already paired with all other rows, though this case should be pretty rare in real situations
         coords_left = self.left.block(df, motives=motives)
 
@@ -92,7 +92,10 @@ class AttributeEquivalenceBlocker(BlockerNode):  # Leaf
     """To regroup rows based on equality across columns."""
 
     def __init__(
-        self, blocking_columns: str|Collection[str], must_not_be_different: str|Collection[str]=None, normalize_strings: bool=True
+        self,
+        blocking_columns: str | Collection[str],
+        must_not_be_different: str | Collection[str] = None,
+        normalize_strings: bool = True,
     ):
         super().__init__()
 
@@ -140,7 +143,7 @@ class AttributeEquivalenceBlocker(BlockerNode):  # Leaf
         else:
             return False
 
-    def block(self, data: pd.DataFrame, motives: bool=False) -> Coords:
+    def block(self, data: pd.DataFrame, motives: bool = False) -> Coords:
         """Regroup rows based on equality of one or more columns"""
 
         print("Processing", self)
@@ -196,7 +199,11 @@ class OverlapBlocker(BlockerNode):  # Leaf
     """To regroup rows based on overlap of one or more columns."""
 
     def __init__(
-        self, blocking_columns: str|Collection[str], overlap: int=1, word_level: bool=False, normalize_strings: bool=True
+        self,
+        blocking_columns: str | Collection[str],
+        overlap: int = 1,
+        word_level: bool = False,
+        normalize_strings: bool = True,
     ):
         super().__init__()
 
@@ -237,7 +244,7 @@ class OverlapBlocker(BlockerNode):  # Leaf
         else:
             return False
 
-    def block(self, data: pd.DataFrame, motives: bool=False) -> Coords:
+    def block(self, data: pd.DataFrame, motives: bool = False) -> Coords:
         """Regroup rows based on overlap of one or more columns"""
 
         print("Processing", self)
@@ -291,12 +298,12 @@ class MixedBlocker(BlockerNode):  # Leaf; For ANDs and RAM
 
     def __init__(
         self,
-        equivalence_columns: str|Collection[str],
-        overlap_columns: str|Collection[str],
-        must_not_be_different: str|Collection[str]=None,
-        overlap: int=1,
-        word_level: bool=False,
-        normalize_strings: bool=True,
+        equivalence_columns: str | Collection[str],
+        overlap_columns: str | Collection[str],
+        must_not_be_different: str | Collection[str] = None,
+        overlap: int = 1,
+        word_level: bool = False,
+        normalize_strings: bool = True,
     ):
         super().__init__()
 
@@ -377,7 +384,7 @@ class MixedBlocker(BlockerNode):  # Leaf; For ANDs and RAM
         else:
             return False
 
-    def block(self, data: pd.DataFrame, motives: bool=False) -> Coords:
+    def block(self, data: pd.DataFrame, motives: bool = False) -> Coords:
         """Regroup rows based on overlap of one or more columns"""
 
         print("Processing", self)
