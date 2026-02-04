@@ -367,13 +367,15 @@ class MixedBlocker(BlockerNode):  # Leaf; For ANDs and RAM
     def __eq__(self, other):
         if type(other) is AttributeEquivalenceBlocker:
             return (
-                set(self.equivalence_columns) == set(other.blocking_columns)
+                not self.overlap_columns
+                and set(self.equivalence_columns) == set(other.blocking_columns)
                 and self.normalize == other.normalize
                 and self.must_not_be_different == other.must_not_be_different
             )
         elif type(other) is OverlapBlocker:
             return (
-                set(self.overlap_columns) == set(other.blocking_columns)
+                not self.equivalence_columns
+                and set(self.overlap_columns) == set(other.blocking_columns)
                 and self.normalize == other.normalize
                 and self.overlap == other.overlap
                 and self.word_level == other.word_level
@@ -395,7 +397,7 @@ class MixedBlocker(BlockerNode):  # Leaf; For ANDs and RAM
 
         print("Processing", self)
 
-        total_columns = self.equivalence_columns + self.overlap_columns
+        total_columns = self.equivalence_columns + self.overlap_columns + self.must_not_be_different
 
         temp_data = data[total_columns].dropna().copy()
 
@@ -685,7 +687,10 @@ def add_blocks_to_dataset(
 
 
 def generate_blocking_report(
-    data: pd.DataFrame, coords: Coords, output_columns: Collection[str] = None
+    data: pd.DataFrame,
+    coords: Coords,
+    output_columns: Collection[str] = None,
+    score: bool = True,
 ) -> pd.DataFrame:
     """
     Shorthand for add_blocks_to_dataset with below arguments
@@ -698,6 +703,7 @@ def generate_blocking_report(
         motives=True,
         show_as_pairs=True,
         output_columns=output_columns,
+        score=score,
     )
 
 
