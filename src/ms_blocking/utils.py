@@ -258,7 +258,7 @@ def merge_blocks_or(coords_1: Coords, coords_2: Coords) -> Coords:
     >>> merge_blocks_or(np.array([{1, 4}, {1, 5}, {6, 7}], np.array([{4, 5}, {6, 7}, {2, 9}]))
     array({1, 4}, {1, 5}, {2, 9}, {4, 5}, {6, 7})
     """
-    if type(coords_1) is type(coords_2) is dict:  # We have motives
+    if isinstance(coords_1, dict) and isinstance(coords_2, dict):  # We have motives
         return {
             pair: (
                 coords_1[pair] + coords_2[pair]
@@ -297,7 +297,7 @@ def merge_blocks_and(coords_1: Coords, coords_2: Coords) -> Coords:
     >>> merge_blocks_and(np.array([{1, 4}, {1, 5}, {6, 7}], np.array([{4, 5}, {6, 7}, {2, 9}]))
     array({1, 4})
     """
-    if type(coords_1) is type(coords_2) is dict:  # We have motives
+    if isinstance(coords_1, dict) and isinstance(coords_2, dict):  # We have motives
         return {
             pair: coords_1[pair] + coords_2[pair]
             for y in (coords_1, coords_2)
@@ -336,7 +336,7 @@ def parse_list(s: str | List, word_level: bool = False) -> List[str]:
     ['string', '1', 'string' '2', ...]
     """
 
-    if type(s) is list:  # If we already have a list
+    if isinstance(s, list):  # If we already have a list
         if (
             len(s) == 1 and str(s[0]).startswith("[") and str(s[0]).endswith("]")
         ):  # In case we have a stringified list INSIDE a normal list
@@ -480,9 +480,9 @@ def solve_motives(motives: List[Motive]) -> List[Motive]:
     #    split_motives += split_motive(motive)
 
     final_motives = [
-        motive for motive in motives if type(motive) is EquivalenceMotive
+        motive for motive in motives if isinstance(motive, EquivalenceMotive)
     ]  # With EquivalenceMotive, equality check suffices
-    overlap_motives = [motive for motive in motives if type(motive) is OverlapMotive]
+    overlap_motives = [motive for motive in motives if isinstance(motive, OverlapMotive)]
     overlap_columns = [motive.blocking_column for motive in overlap_motives]
 
     for column in overlap_columns:

@@ -51,7 +51,7 @@ class AndNode(BlockerNode):
 
         id_lists = (
             set(flatten(coords_left.keys()))
-            if type(coords_left) is dict
+            if isinstance(coords_left, dict)
             else set(flatten(coords_left))
         )
         df_shortened = (
@@ -97,14 +97,14 @@ class AttributeEquivalenceBlocker(BlockerNode):  # Leaf
         super().__init__()
 
         # Column(s) to block on
-        if type(blocking_columns) is str:
+        if isinstance(blocking_columns, str):
             self.blocking_columns = [blocking_columns]
         else:
             self.blocking_columns = list(set(blocking_columns))  # Ensure no duplicates
 
         # Define it to block on a second column where NaNs are accepted
         if must_not_be_different is not None:
-            if type(must_not_be_different) is str:
+            if isinstance(must_not_be_different, str):
                 must_not_be_different = [must_not_be_different]
             if len(must_not_be_different) > 1:
                 raise ValueError("There must be only one extra column")
@@ -124,13 +124,13 @@ class AttributeEquivalenceBlocker(BlockerNode):  # Leaf
         return f"AttributeEquivalenceBlocker({self.blocking_columns}{', ' + str(self.must_not_be_different) if self.must_not_be_different else ''}{', NON-NORMALIZED' if not self.normalize else ''})"
 
     def __eq__(self, other):
-        if type(other) is AttributeEquivalenceBlocker:
+        if isinstance(other, AttributeEquivalenceBlocker):
             return (
                 set(self.blocking_columns) == set(other.blocking_columns)
                 and self.must_not_be_different == other.must_not_be_different
                 and self.normalize == other.normalize
             )
-        elif type(other) is MixedBlocker:
+        elif isinstance(other, MixedBlocker):
             return (
                 set(self.blocking_columns) == set(other.equivalence_columns)
                 and not other.overlap_columns
@@ -199,7 +199,7 @@ class OverlapBlocker(BlockerNode):  # Leaf
         super().__init__()
 
         # Column(s) to block on
-        if type(blocking_columns) is str:
+        if isinstance(blocking_columns, str):
             self.blocking_columns = [blocking_columns]
         else:
             self.blocking_columns = list(set(blocking_columns))  # Ensure no duplicates
@@ -217,14 +217,14 @@ class OverlapBlocker(BlockerNode):  # Leaf
         return f"OverlapBlocker({self.blocking_columns}, {self.overlap}{', WORD-LEVEL' if self.word_level else ''}{', NON-NORMALIZED' if not self.normalize else ''})"
 
     def __eq__(self, other):
-        if type(other) is OverlapBlocker:
+        if isinstance(other, OverlapBlocker):
             return (
                 set(self.blocking_columns) == set(other.blocking_columns)
                 and self.normalize == other.normalize
                 and self.overlap == other.overlap
                 and self.word_level == other.word_level
             )
-        elif type(other) is MixedBlocker:
+        elif isinstance(other, MixedBlocker):
             return (
                 set(self.blocking_columns) == set(other.overlap_columns)
                 and not other.equivalence_columns
@@ -305,14 +305,14 @@ class MixedBlocker(BlockerNode):  # Leaf; For ANDs and RAM
         super().__init__()
 
         # Column(s) to block on
-        if type(equivalence_columns) is str:
+        if isinstance(equivalence_columns, str):
             self.equivalence_columns = [equivalence_columns]
         else:
             self.equivalence_columns = list(
                 set(equivalence_columns)
             )  # Ensure no duplicates
 
-        if type(overlap_columns) is str:
+        if isinstance(overlap_columns, str):
             self.overlap_columns = [overlap_columns]
         else:
             self.overlap_columns = list(set(overlap_columns))  # Ensure no duplicates
@@ -325,7 +325,7 @@ class MixedBlocker(BlockerNode):  # Leaf; For ANDs and RAM
 
         # Define it to block on a second column where NaNs are accepted
         if must_not_be_different is not None:
-            if type(must_not_be_different) is str:
+            if isinstance(must_not_be_different, str):
                 must_not_be_different = [must_not_be_different]
             if len(must_not_be_different) > 1:
                 raise ValueError("There must be only one extra column")
@@ -356,14 +356,14 @@ class MixedBlocker(BlockerNode):  # Leaf; For ANDs and RAM
         )
 
     def __eq__(self, other):
-        if type(other) is AttributeEquivalenceBlocker:
+        if isinstance(other, AttributeEquivalenceBlocker):
             return (
                 not self.overlap_columns
                 and set(self.equivalence_columns) == set(other.blocking_columns)
                 and self.normalize == other.normalize
                 and self.must_not_be_different == other.must_not_be_different
             )
-        elif type(other) is OverlapBlocker:
+        elif isinstance(other, OverlapBlocker):
             return (
                 not self.equivalence_columns
                 and set(self.overlap_columns) == set(other.blocking_columns)
@@ -371,7 +371,7 @@ class MixedBlocker(BlockerNode):  # Leaf; For ANDs and RAM
                 and self.overlap == other.overlap
                 and self.word_level == other.word_level
             )
-        elif type(other) is MixedBlocker:
+        elif isinstance(other, MixedBlocker):
             return (
                 set(self.equivalence_columns) == set(other.equivalence_columns)
                 and set(self.overlap_columns) == set(other.overlap_columns)
@@ -519,7 +519,7 @@ def add_blocks_to_dataset(
         raise ValueError("Cannot both return pairs and keep ungrouped rows")
 
     if motives:
-        if type(coords) is not dict:
+        if not isinstance(coords, dict):
             raise TypeError("Cannot specify 'motives=True' without passing motives")
 
     # Ensure the index is a unique identifier
@@ -729,8 +729,8 @@ def merge_blockers(
       Blocker that represents both conditions
     """
     if (
-        type(left) is AttributeEquivalenceBlocker
-        and type(right) is AttributeEquivalenceBlocker
+        isinstance(left, AttributeEquivalenceBlocker)
+        and isinstance(right, AttributeEquivalenceBlocker)
         and left.normalize == right.normalize
         and left.must_not_be_different == right.must_not_be_different
     ):
@@ -741,8 +741,8 @@ def merge_blockers(
         )
 
     elif (
-        type(left) is OverlapBlocker
-        and type(right) is OverlapBlocker
+        isinstance(left, OverlapBlocker)
+        and isinstance(right, OverlapBlocker)
         and left.normalize == right.normalize
         and left.overlap == right.overlap
         and left.word_level == right.word_level
@@ -755,8 +755,8 @@ def merge_blockers(
         )
 
     elif (
-        type(left) is AttributeEquivalenceBlocker
-        and type(right) is OverlapBlocker
+        isinstance(left, AttributeEquivalenceBlocker)
+        and isinstance(right, OverlapBlocker)
         and left.normalize == right.normalize
     ):
         return MixedBlocker(
@@ -768,8 +768,8 @@ def merge_blockers(
         )
 
     elif (
-        type(left) is OverlapBlocker
-        and type(right) is AttributeEquivalenceBlocker
+        isinstance(left, OverlapBlocker)
+        and isinstance(right, AttributeEquivalenceBlocker)
         and left.normalize == right.normalize
     ):
         return MixedBlocker(
@@ -781,8 +781,8 @@ def merge_blockers(
         )
 
     elif (
-        type(left) is MixedBlocker
-        and type(right) is MixedBlocker
+        isinstance(left, MixedBlocker)
+        and isinstance(right, MixedBlocker)
         and left.normalize == right.normalize
         and left.overlap == right.overlap
         and left.word_level == right.word_level
@@ -799,8 +799,8 @@ def merge_blockers(
         )
 
     elif (
-        type(left) is MixedBlocker
-        and type(right) is AttributeEquivalenceBlocker
+        isinstance(left, MixedBlocker)
+        and isinstance(right, AttributeEquivalenceBlocker)
         and left.normalize == right.normalize
     ):
         return MixedBlocker(
@@ -815,8 +815,8 @@ def merge_blockers(
         )
 
     elif (
-        type(left) is AttributeEquivalenceBlocker
-        and type(right) is MixedBlocker
+        isinstance(left,AttributeEquivalenceBlocker)
+        and isinstance(right, MixedBlocker)
         and left.normalize == right.normalize
     ):
         return MixedBlocker(
@@ -831,8 +831,8 @@ def merge_blockers(
         )
 
     elif (
-        type(left) is MixedBlocker
-        and type(right) is OverlapBlocker
+        isinstance(left, MixedBlocker)
+        and isinstance(right, OverlapBlocker)
         and left.normalize == right.normalize
         and left.overlap == right.overlap
         and left.word_level == right.word_level
@@ -847,8 +847,8 @@ def merge_blockers(
         )
 
     elif (
-        type(left) is OverlapBlocker
-        and type(right) is MixedBlocker
+        isinstance(left, OverlapBlocker)
+        and isinstance(right, MixedBlocker)
         and left.normalize == right.normalize
         and left.overlap == right.overlap
         and left.word_level == right.word_level
