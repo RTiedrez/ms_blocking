@@ -790,12 +790,68 @@ def test_empty_after_must_not_be_different():
 
 def test_solve_motives():
     motive_ae_city = msb.EquivalenceMotive("City")
-    assert all([x in [motive_ae_city] for x in msb.solve_motives([motive_ae_city, motive_ae_city])]) and len([motive_ae_city]) == len(msb.solve_motives([motive_ae_city, motive_ae_city]))
+    assert all(
+        [
+            x in [motive_ae_city]
+            for x in msb.solve_motives([motive_ae_city, motive_ae_city])
+        ]
+    ) and len([motive_ae_city]) == len(
+        msb.solve_motives([motive_ae_city, motive_ae_city])
+    )
     motive_overlap_websites_1 = msb.OverlapMotive("websites", 1)
     motive_overlap_websites_2 = msb.OverlapMotive("websites", 2)
-    motive_overlap_websites_1_word_level = msb.OverlapMotive("websites", 1, word_level=True)
-    motive_overlap_websites_2_word_level = msb.OverlapMotive("websites", 2, word_level=True)
-    assert all([x in [motive_overlap_websites_2] for x in msb.solve_motives([motive_overlap_websites_1, motive_overlap_websites_2])]) and len([motive_overlap_websites_2]) == len(msb.solve_motives([motive_overlap_websites_1, motive_overlap_websites_2]))
-    assert all([x in [motive_overlap_websites_1, motive_overlap_websites_2_word_level] for x in msb.solve_motives([motive_overlap_websites_1, motive_overlap_websites_2_word_level])]) and len([motive_overlap_websites_1, motive_overlap_websites_2_word_level]) == len(msb.solve_motives([motive_overlap_websites_1, motive_overlap_websites_2_word_level]))
-    assert all([x in [motive_overlap_websites_2] for x in msb.solve_motives([motive_overlap_websites_2, motive_overlap_websites_2_word_level])]) and len([motive_overlap_websites_2]) == len(msb.solve_motives([motive_overlap_websites_2, motive_overlap_websites_2_word_level]))
-    assert all([x in [motive_overlap_websites_2_word_level] for x in msb.solve_motives([motive_overlap_websites_1_word_level, motive_overlap_websites_2_word_level])]) and len([motive_overlap_websites_2_word_level]) == len(msb.solve_motives([motive_overlap_websites_1_word_level, motive_overlap_websites_2_word_level]))
+    motive_overlap_websites_1_word_level = msb.OverlapMotive(
+        "websites", 1, word_level=True
+    )
+    motive_overlap_websites_2_word_level = msb.OverlapMotive(
+        "websites", 2, word_level=True
+    )
+    assert all(
+        [
+            x in [motive_overlap_websites_2]
+            for x in msb.solve_motives(
+                [motive_overlap_websites_1, motive_overlap_websites_2]
+            )
+        ]
+    ) and len([motive_overlap_websites_2]) == len(
+        msb.solve_motives([motive_overlap_websites_1, motive_overlap_websites_2])
+    )
+    assert all(
+        [
+            x in [motive_overlap_websites_1, motive_overlap_websites_2_word_level]
+            for x in msb.solve_motives(
+                [motive_overlap_websites_1, motive_overlap_websites_2_word_level]
+            )
+        ]
+    ) and len([motive_overlap_websites_1, motive_overlap_websites_2_word_level]) == len(
+        msb.solve_motives(
+            [motive_overlap_websites_1, motive_overlap_websites_2_word_level]
+        )
+    )
+    assert all(
+        [
+            x in [motive_overlap_websites_2]
+            for x in msb.solve_motives(
+                [motive_overlap_websites_2, motive_overlap_websites_2_word_level]
+            )
+        ]
+    ) and len([motive_overlap_websites_2]) == len(
+        msb.solve_motives(
+            [motive_overlap_websites_2, motive_overlap_websites_2_word_level]
+        )
+    )
+    assert all(
+        [
+            x in [motive_overlap_websites_2_word_level]
+            for x in msb.solve_motives(
+                [
+                    motive_overlap_websites_1_word_level,
+                    motive_overlap_websites_2_word_level,
+                ]
+            )
+        ]
+    ) and len([motive_overlap_websites_2_word_level]) == len(
+        msb.solve_motives(
+            [motive_overlap_websites_1_word_level, motive_overlap_websites_2_word_level]
+        )
+    )
