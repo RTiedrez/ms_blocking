@@ -651,12 +651,27 @@ def test_edge_normalize():
     expected = ["abricot", "banane", "couscous", 42]
     actual = msb.normalize(["__Abricot", "Banane", "(Couscous)", 42])
     assert actual == expected
-    assert msb.normalize([None, None]) == [None, None]
+    assert msb.normalize([None, None]) == []
+    assert msb.normalize(["__Abricot", None]) == ["abricot"]
+
 
 def test_edge_parse_list():
-    assert msb.parse_list([["a", "b", "c"]]) == ["a", "b", "c"]
+    assert msb.parse_list([["a", "b", "c d e"]]) == ["a", "b", "c d e"]
     assert msb.parse_list(['["a", "b", "c"]']) == ["a", "b", "c"]
-    assert msb.parse_list('[-42-]') == [42]
+    assert msb.parse_list(["a", "b", "c d e"]) == ["a", "b", "c d e"]
+    assert msb.parse_list("[-42-]") == ["[-42-]"]
+    assert msb.parse_list('["a", "b", "c d e"]', word_level=True) == [
+        "a",
+        "b",
+        "c",
+        "d",
+        "e",
+    ]
+    assert msb.parse_list(["a", "b", None]) == ["a", "b"]
+    assert msb.parse_list([None, None, None]) == []
+    assert msb.parse_list(None) == []
+    assert msb.parse_list([]) == []
+    assert msb.parse_list("") == []
 
 
 def test_errors_with_functions():
@@ -690,6 +705,9 @@ def test_errors_with_functions():
     with pytest.raises(TypeError):
         # noinspection PyTypeChecker
         msb.flatten(42)
+    with pytest.raises(ValueError):
+        # noinspection PyTypeChecker
+        msb.solve_motives([])
 
 
 def test_passing_strings_to_constructors(city_age_name_websites_pipelining_id):
@@ -725,6 +743,8 @@ def test_return_empty():
 
     actual = (nope_blocker_ae & nope_blocker_overlap).block(get_users(), motives=True)
     assert actual == dict()
+
+    assert list(msb.solve_connected_components_from_coords({})) == []
 
 
 def test_add_empty_coords_to_dataframe():
@@ -766,3 +786,16 @@ def test_empty_after_must_not_be_different():
         frozenset({8, 11}): [msb.EquivalenceMotive("Age")],
         frozenset({2, 5}): [msb.EquivalenceMotive("Age")],
     }
+
+
+def test_solve_motives():
+    motive_ae_city = msb.EquivalenceMotive("City")
+    assert all([x in [motive_ae_city] for x in msb.solve_motives([motive_ae_city, motive_ae_city])]) and len([motive_ae_city]) == len(msb.solve_motives([motive_ae_city, motive_ae_city]))
+    motive_overlap_websites_1 = msb.OverlapMotive("websites", 1)
+    motive_overlap_websites_2 = msb.OverlapMotive("websites", 2)
+    motive_overlap_websites_1_word_level = msb.OverlapMotive("websites", 1, word_level=True)
+    motive_overlap_websites_2_word_level = msb.OverlapMotive("websites", 2, word_level=True)
+    assert all([x in [motive_overlap_websites_2] for x in msb.solve_motives([motive_overlap_websites_1, motive_overlap_websites_2])]) and len([motive_overlap_websites_2]) == len(msb.solve_motives([motive_overlap_websites_1, motive_overlap_websites_2]))
+    assert all([x in [motive_overlap_websites_1, motive_overlap_websites_2_word_level] for x in msb.solve_motives([motive_overlap_websites_1, motive_overlap_websites_2_word_level])]) and len([motive_overlap_websites_1, motive_overlap_websites_2_word_level]) == len(msb.solve_motives([motive_overlap_websites_1, motive_overlap_websites_2_word_level]))
+    assert all([x in [motive_overlap_websites_2] for x in msb.solve_motives([motive_overlap_websites_2, motive_overlap_websites_2_word_level])]) and len([motive_overlap_websites_2]) == len(msb.solve_motives([motive_overlap_websites_2, motive_overlap_websites_2_word_level]))
+    assert all([x in [motive_overlap_websites_2_word_level] for x in msb.solve_motives([motive_overlap_websites_1_word_level, motive_overlap_websites_2_word_level])]) and len([motive_overlap_websites_2_word_level]) == len(msb.solve_motives([motive_overlap_websites_1_word_level, motive_overlap_websites_2_word_level]))
