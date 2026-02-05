@@ -194,19 +194,15 @@ def normalize(text: Any) -> Any:
     'i like music'
     """
 
-    try:
-        if pd.isna(text):
-            return text
-    except ValueError:  # We have an array
-        if pd.isna(text).all():
-            return text
-        else:
-            text = [s for s in text if not pd.isna(s)]
+    if pd.isna(text) if not isinstance(text, (list, tuple, set)) else False:
+        return text
 
     if isinstance(text, str):
         return normalize_function(text)
-    elif isinstance(text, list|tuple|set):
-        return [normalize_function(item) for item in text]
+    elif isinstance(text, (list, tuple, set)):
+        # Filter out None and NaN values from the list first
+        filtered_text = [s for s in text if s is not None and not pd.isna(s)]
+        return [normalize_function(item) for item in filtered_text]
     else:
         return normalize_function(str(text))
 
@@ -346,36 +342,39 @@ def parse_list(s: str | List, word_level: bool = False) -> List[str]:
         ):  # In case we have a stringified list INSIDE a normal list
             s = s[0]
         else:
-            return s
+            # Filter None and NaN
+            return [item for item in s if item is not None and not pd.isna(item)]
 
     try:
         if pd.isna(s):
             return []
     except ValueError:  # We have an array
-        if pd.isna(s).all():
-            return []
+        pass
 
-    s = str(s).strip()
+    s_str = str(s).strip()
 
-    if not s:
+    if not s_str:
         return []
 
-    if s.startswith("[") and s.endswith("]"):  # Stringified list?
+    if s_str.startswith("[") and s_str.endswith("]"):  # Stringified list?
         try:
-            parts = ast.literal_eval(s)
-        except ValueError:  # doesn't seem to be a stringified list
-            parts = s.split("', '")
-        except SyntaxError:  # In case we have a string surrouded by brackets
-            parts = s.split()
+            parts = ast.literal_eval(s_str)
+        # except ValueError:  # doesn't seem to be a stringified list
+        #    parts = s_str.split("', '")
+        except SyntaxError:  # In case we have a string surrounded by brackets
+            parts = s_str.split()
     else:
-        parts = s.split()
+        parts = s_str.split()
 
-    cleaned_items = [str(part).strip().strip("''") for part in parts]
+    # Filter None and NaN before converting to string
+    filtered_parts = [p for p in parts if p is not None and not pd.isna(p)]
+
+    cleaned_items = [str(part).strip().strip("''") for part in filtered_parts]
 
     if word_level:
-        return [w for s in cleaned_items for w in s.split() if len(w) > 0]
+        return [w for item in cleaned_items for w in item.split() if len(w) > 0]
     else:
-        return [s for s in cleaned_items if len(s) > 0]
+        return [item for item in cleaned_items if len(item) > 0]
 
 
 def block_overlap(groups: Iterable, overlap: int = 1) -> Coords:
