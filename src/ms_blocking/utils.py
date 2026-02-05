@@ -482,7 +482,9 @@ def solve_motives(motives: List[Motive]) -> List[Motive]:
     final_motives = [
         motive for motive in motives if isinstance(motive, EquivalenceMotive)
     ]  # With EquivalenceMotive, equality check suffices
-    overlap_motives = [motive for motive in motives if isinstance(motive, OverlapMotive)]
+    overlap_motives = [
+        motive for motive in motives if isinstance(motive, OverlapMotive)
+    ]
     overlap_columns = [motive.blocking_column for motive in overlap_motives]
 
     for column in overlap_columns:

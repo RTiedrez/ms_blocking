@@ -815,7 +815,7 @@ def merge_blockers(
         )
 
     elif (
-        isinstance(left,AttributeEquivalenceBlocker)
+        isinstance(left, AttributeEquivalenceBlocker)
         and isinstance(right, MixedBlocker)
         and left.normalize == right.normalize
     ):
