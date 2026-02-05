@@ -643,20 +643,23 @@ def add_blocks_to_dataset(
         output_data.loc[:, ["_block"]] = start_from_zero(output_data["_block"])
 
         if sort:
-            # Check that we do not already have a column named "original_index"
+            data_index = output_data.index.to_numpy()
+            # Check that we do not already have a column named "_original_index"
             temp_original_index = None
             original_index_in_columns = False
-            if "original_index" in output_data.columns:
-                temp_original_index = output_data["original_index"].copy()
+            if "_original_index" in output_data.columns:
+                temp_original_index = list(
+                    output_data["_original_index"].copy()
+                )  # list needed to deepcopy
+                output_data = output_data.drop(columns=["_original_index"])
                 original_index_in_columns = True
+
             # Sort by block, then by original index
-
-            output_data.loc[:, ["original_index"]] = output_data.index.to_numpy()
-            output_data = output_data.sort_values(["_block", "original_index"])
-            output_data = output_data.drop(columns=["original_index"])
+            output_data.loc[:, ["_original_index"]] = data_index
+            output_data = output_data.sort_values(["_block", "_original_index"])
+            output_data = output_data.drop(columns=["_original_index"])
             if original_index_in_columns:
-                output_data["original_index"] = temp_original_index
-
+                output_data["_original_index"] = temp_original_index
 
         if not show_as_pairs and motives:
             id_list = flatten(coords.keys())
