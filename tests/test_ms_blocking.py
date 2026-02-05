@@ -855,3 +855,17 @@ def test_solve_motives():
             [motive_overlap_websites_1_word_level, motive_overlap_websites_2_word_level]
         )
     )
+
+
+def test_sort_when_adding_blocks_to_dataframe_but_original_index_in_columns(
+    overlap_websites_merge_blocks,
+):
+    expected = overlap_websites_merge_blocks
+    websites_blocker = msb.OverlapBlocker(["websites"])
+    df = get_users()
+    df["_original_index"] = list(range(len(df)))
+    links = websites_blocker.block(df)
+    actual = msb.add_blocks_to_dataset(df, links, merge_blocks=False)[
+        "_block"
+    ].to_list()
+    assert actual == expected
