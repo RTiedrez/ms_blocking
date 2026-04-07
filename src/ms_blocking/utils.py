@@ -475,10 +475,6 @@ def solve_motives(motives: List[Motive]) -> List[Motive]:
     if not motives:
         raise ValueError("Motives must not be empty")
 
-    # split_motives = []
-    # for motive in motives:
-    #    split_motives += split_motive(motive)
-
     final_motives = [
         motive for motive in motives if isinstance(motive, EquivalenceMotive)
     ]  # With EquivalenceMotive, equality check suffices
